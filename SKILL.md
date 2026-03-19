@@ -296,13 +296,22 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 【预测方案】
  • 预测目标：{target}
- • 模型类型：{model}（ARIMA / 线性回归）
+ • 模型选择：自动对比（ARIMA / 线性回归 / 指数平滑 / Prophet）
  • 数据范围：{data_range}
- • 预测周期：{periods}
+ • 预测周期：{periods} 天
+ • 评估指标：MSE（均方误差）/ AIC（赤池信息量）
+
+【支持的模型】
+ • ARIMA - 时间序列模型（适合有趋势/季节性的数据）
+ • 线性回归 - 简单趋势预测
+ • 指数平滑 - 短期预测
+ • Prophet - Facebook 开源模型（适合复杂模式）
+
+系统会自动训练所有可用模型，选择误差最小的作为最优模型。
 
 请确认：
  • 回复「确认」→ 执行预测
- • 回复「修改 XXX」→ 调整参数
+ • 回复「修改 模型 XXX」→ 指定单一模型
  • 回复「取消」→ 取消
 ```
 
@@ -315,13 +324,24 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 ✅ 预测完成
  • 预测 ID：{prediction_id}
- • 模型：{model}
+ • 训练模型数：{models_trained} 个
+ • 最优模型：{best_model_name}
 
-【预测摘要】
+【模型对比】
+{列出所有训练模型的评估指标}
+ 1. {model_1_name}: MSE={mse_1}, MAE={mae_1}
+ 2. {model_2_name}: MSE={mse_2}, MAE={mae_2}
+ ...
+
+【最优模型预测摘要】
 {预测结果的关键趋势和数值}
+ • 平均预测值：{mean_forecast}
+ • 预测范围：{min_forecast} - {max_forecast}
+ • 标准差：{std_forecast}
 
 【记录保存】
-✅ 预测脚本已保存，可通过 /duckdb 运行预测 {prediction_id} 重新执行
+✅ 所有模型结果已保存
+✅ 可通过 /duckdb 运行预测 {prediction_id} 重新执行
 
 是否配置为定时任务？（是/否）
 ```

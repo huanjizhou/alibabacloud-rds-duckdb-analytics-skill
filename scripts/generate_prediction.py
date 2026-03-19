@@ -5,12 +5,13 @@ generate_prediction.py - 生成预测逻辑
 Generate Prediction Logic
 
 功能:
-- 生成预测脚本（ARIMA/线性回归）
+- 生成预测脚本（支持多模型自动对比）
+- 自动选择最优模型
 - 配置 OpenClaw Cron 任务
 - 保存预测配置
 
 Usage:
-    python generate_prediction.py --target "未来 30 天数据趋势预测" --model arima --env-file .env
+    python generate_prediction.py --target "未来 30 天数据趋势预测" --models auto --env-file .env
 """
 
 import argparse
@@ -24,7 +25,7 @@ from dotenv import load_dotenv
 
 
 def generate_script(target, model_type, parameters, config):
-    """生成预测脚本"""
+    """生成预测脚本 - 支持多模型对比"""
     timestamp = datetime.now()
     prediction_id = f"pred_{timestamp.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     
@@ -37,16 +38,26 @@ def generate_script(target, model_type, parameters, config):
     output_file = results_dir / f"{prediction_id}_result.json"
     script_file = date_dir / f"{prediction_id}.py"
     
-    # 生成脚本内容（通用示例）
+    # 支持的模型列表
+    if model_type == "auto":
+        models_to_run = ["arima", "linear_regression", "exponential_smoothing", "prophet"]
+    else:
+        models_to_run = [model_type]
+    
+    # 生成脚本内容（多模型对比版本）
     script_content = f'''#!/usr/bin/env python3
 # 预测脚本 - {target}
 # 生成时间：{timestamp.isoformat()}
-# 模型：{model_type}
+# 模型：{"多模型自动对比" if model_type == "auto" else model_type}
+# 说明：自动训练多个模型，选择最优结果
 
 import json
 import sys
+import warnings
 from pathlib import Path
 from datetime import datetime
+
+warnings.filterwarnings("ignore")
 
 try:
     import pymysql
@@ -56,20 +67,215 @@ except ImportError as e:
     print(f"错误：{{e}}")
     sys.exit(1)
 
+# 模型导入（可选）
 try:
     from statsmodels.tsa.arima.model import ARIMA
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    ARIMA_AVAILABLE = True
 except ImportError:
-    ARIMA = None
+    ARIMA_AVAILABLE = False
+    print("⚠️  statsmodels 未安装，跳过 ARIMA/指数平滑模型")
 
 try:
     from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    LINEAR_REGRESSION_AVAILABLE = True
 except ImportError:
-    LinearRegression = None
+    LINEAR_REGRESSION_AVAILABLE = False
+    print("⚠️  scikit-learn 未安装，跳过线性回归模型")
+
+try:
+    from prophet import Prophet
+    PROPHET_AVAILABLE = True
+except ImportError:
+    PROPHET_AVAILABLE = False
+    print("⚠️  prophet 未安装，跳过 Prophet 模型")
+
+
+def load_data(conn):
+    """加载历史数据"""
+    query = """
+    SELECT DATE(created_at) as date, AVG(metric_value) as daily_metric
+    FROM your_table
+    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+    GROUP BY DATE(created_at)
+    ORDER BY date
+    """
+    df = conn.execute(query).fetchdf()
+    return df
+
+
+def train_arima(df, forecast_periods):
+    """ARIMA 模型"""
+    if not ARIMA_AVAILABLE:
+        return None
+    
+    try:
+        print("  训练 ARIMA 模型...")
+        data = df['daily_metric'].dropna()
+        
+        # 自动选择最优参数（简化版）
+        best_aic = float('inf')
+        best_order = (1, 1, 1)
+        
+        for p in range(3):
+            for d in range(2):
+                for q in range(3):
+                    try:
+                        model = ARIMA(data, order=(p, d, q))
+                        model_fit = model.fit()
+                        if model_fit.aic < best_aic:
+                            best_aic = model_fit.aic
+                            best_order = (p, d, q)
+                    except:
+                        continue
+        
+        print(f"  最优参数：p={{best_order[0]}}, d={{best_order[1]}}, q={{best_order[2]}}")
+        model = ARIMA(data, order=best_order)
+        model_fit = model.fit()
+        forecast = model_fit.forecast(steps=forecast_periods)
+        
+        # 计算训练误差
+        predictions = model_fit.predict(start=len(data)-30, end=len(data)-1)
+        actual = data.iloc[-30:]
+        mse = mean_squared_error(actual, predictions) if len(predictions) == len(actual) else float('inf')
+        
+        return {{
+            "model_name": "ARIMA",
+            "forecast": forecast.tolist(),
+            "params": {{"p": best_order[0], "d": best_order[1], "q": best_order[2]}},
+            "metrics": {{"aic": best_aic, "mse": mse}}
+        }}
+    except Exception as e:
+        print(f"  ARIMA 训练失败：{{e}}")
+        return None
+
+
+def train_linear_regression(df, forecast_periods):
+    """线性回归模型"""
+    if not LINEAR_REGRESSION_AVAILABLE:
+        return None
+    
+    try:
+        print("  训练线性回归模型...")
+        df_copy = df.copy()
+        df_copy['day_index'] = range(len(df_copy))
+        
+        X = df_copy[['day_index']].values
+        y = df_copy['daily_metric'].values
+        
+        model = LinearRegression()
+        model.fit(X, y)
+        
+        future_days = np.arange(len(df), len(df) + forecast_periods).reshape(-1, 1)
+        forecast = model.predict(future_days)
+        
+        # 计算训练误差
+        predictions = model.predict(X)
+        mse = mean_squared_error(y, predictions)
+        mae = mean_absolute_error(y, predictions)
+        
+        return {{
+            "model_name": "Linear Regression",
+            "forecast": forecast.tolist(),
+            "params": {{"coef": float(model.coef_[0]), "intercept": float(model.intercept_)}},
+            "metrics": {{"mse": mse, "mae": mae, "r2": float(model.score(X, y))}}
+        }}
+    except Exception as e:
+        print(f"  线性回归训练失败：{{e}}")
+        return None
+
+
+def train_exponential_smoothing(df, forecast_periods):
+    """指数平滑模型"""
+    if not ARIMA_AVAILABLE:
+        return None
+    
+    try:
+        print("  训练指数平滑模型...")
+        data = df['daily_metric'].dropna()
+        
+        # 尝试不同组合
+        best_model = None
+        best_aic = float('inf')
+        
+        for trend in [None, 'add']:
+            for seasonal in [None, 'add']:
+                try:
+                    model = ExponentialSmoothing(
+                        data,
+                        trend=trend,
+                        seasonal=seasonal,
+                        seasonal_periods=7 if len(data) >= 14 else None
+                    )
+                    model_fit = model.fit()
+                    if hasattr(model_fit, 'aic') and model_fit.aic < best_aic:
+                        best_aic = model_fit.aic
+                        best_model = model_fit
+                except:
+                    continue
+        
+        if best_model is None:
+            return None
+        
+        forecast = best_model.forecast(forecast_periods)
+        
+        return {{
+            "model_name": "Exponential Smoothing",
+            "forecast": forecast.tolist(),
+            "params": {{}},
+            "metrics": {{"aic": best_aic}}
+        }}
+    except Exception as e:
+        print(f"  指数平滑训练失败：{{e}}")
+        return None
+
+
+def train_prophet(df, forecast_periods):
+    """Prophet 模型"""
+    if not PROPHET_AVAILABLE:
+        return None
+    
+    try:
+        print("  训练 Prophet 模型...")
+        prophet_df = df.copy()
+        prophet_df.columns = ['ds', 'y']
+        
+        model = Prophet(daily_seasonality=True, verbose=False)
+        model.fit(prophet_df)
+        
+        future = model.make_future_dataframe(periods=forecast_periods)
+        forecast = model.predict(future)
+        
+        return {{
+            "model_name": "Prophet",
+            "forecast": forecast['yhat'].tail(forecast_periods).tolist(),
+            "params": {{}},
+            "metrics": {{}}
+        }}
+    except Exception as e:
+        print(f"  Prophet 训练失败：{{e}}")
+        return None
+
+
+def select_best_model(results):
+    """选择最优模型（基于 MSE）"""
+    valid_results = [r for r in results if r is not None and 'mse' in r.get('metrics', {{}})]
+    
+    if not valid_results:
+        # 如果没有 MSE，使用 AIC
+        valid_results = [r for r in results if r is not None and 'aic' in r.get('metrics', {{}})]
+        if valid_results:
+            return min(valid_results, key=lambda x: x['metrics']['aic'])
+        return None
+    
+    return min(valid_results, key=lambda x: x['metrics']['mse'])
+
 
 def main():
     OUTPUT_FILE = "{output_file}"
-    MODEL_TYPE = "{model_type}"
     TARGET = "{target}"
+    FORECAST_PERIODS = {parameters.get('forecast_periods', 30)}
     
     # 从环境变量读取配置
     import os
@@ -82,105 +288,147 @@ def main():
     RDS_PASSWORD = os.getenv("DUCKDB_PASSWORD")
     RDS_DATABASE = os.getenv("DUCKDB_DATABASE")
     
+    print("=" * 60)
     print(f"开始预测：{{TARGET}}")
     print(f"连接 RDS: {{RDS_HOST}}:{{RDS_PORT}}")
+    print(f"预测周期：{{FORECAST_PERIODS}} 天")
+    print("=" * 60)
     
-    # 通过 MySQL 协议连接 RDS (DuckDB FDW)
-    conn = pymysql.connect(
-        host=RDS_HOST,
-        port=RDS_PORT,
-        user=RDS_USER,
-        password=RDS_PASSWORD,
-        database=RDS_DATABASE,
-        charset="utf8mb4",
-        connect_timeout=10
-    )
-    
-    # 加载历史数据（通用查询示例）
-    query = """
-    SELECT DATE(created_at) as date, AVG(metric_value) as daily_metric
-    FROM your_table
-    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
-    GROUP BY DATE(created_at)
-    ORDER BY date
-    """
-    
-    df = conn.execute(query).fetchdf()
-    print(f"加载了 {{len(df)}} 条数据")
-    
-    # 训练模型
-    if MODEL_TYPE == "arima" and ARIMA:
-        p, d, q = {parameters.get('p', 1)}, {parameters.get('d', 1)}, {parameters.get('q', 1)}
-        model = ARIMA(df['daily_metric'].dropna(), order=(p, d, q))
-        model_fit = model.fit()
-        forecast = model_fit.forecast(steps={parameters.get('forecast_periods', 30)})
-    elif MODEL_TYPE == "linear_regression" and LinearRegression:
-        df['day_index'] = range(len(df))
-        X = df[['day_index']].values
-        y = df['daily_metric'].values
-        model = LinearRegression()
-        model.fit(X, y)
-        future_days = np.arange(len(df), len(df) + {parameters.get('forecast_periods', 30)}).reshape(-1, 1)
-        forecast = model.predict(future_days)
-    else:
-        print(f"模型不可用：{{MODEL_TYPE}}")
+    # 连接数据库
+    try:
+        conn = pymysql.connect(
+            host=RDS_HOST,
+            port=RDS_PORT,
+            user=RDS_USER,
+            password=RDS_PASSWORD,
+            database=RDS_DATABASE,
+            charset="utf8mb4",
+            connect_timeout=10
+        )
+        print("✓ 数据库连接成功")
+    except Exception as e:
+        print(f"❌ 数据库连接失败：{{e}}")
         return 1
     
-    # 保存结果
-    results = {{
+    # 加载数据
+    print("\\n【步骤 1/3】加载历史数据...")
+    df = load_data(conn)
+    print(f"✓ 加载了 {{len(df)}} 条数据（{{df['date'].min()}} 至 {{df['date'].max()}}）")
+    
+    if len(df) < 30:
+        print(f"❌ 数据量不足（至少需要 30 条，当前 {{len(df)}} 条）")
+        return 1
+    
+    # 训练多个模型
+    print("\\n【步骤 2/3】训练多个模型...")
+    models_to_train = {json.dumps(models_to_run)}
+    
+    results = []
+    
+    if "arima" in models_to_train:
+        result = train_arima(df, FORECAST_PERIODS)
+        if result:
+            results.append(result)
+    
+    if "linear_regression" in models_to_train:
+        result = train_linear_regression(df, FORECAST_PERIODS)
+        if result:
+            results.append(result)
+    
+    if "exponential_smoothing" in models_to_train:
+        result = train_exponential_smoothing(df, FORECAST_PERIODS)
+        if result:
+            results.append(result)
+    
+    if "prophet" in models_to_train:
+        result = train_prophet(df, FORECAST_PERIODS)
+        if result:
+            results.append(result)
+    
+    if not results:
+        print("❌ 所有模型训练失败")
+        return 1
+    
+    # 选择最优模型
+    print("\\n【步骤 3/3】选择最优模型...")
+    best_result = select_best_model(results)
+    
+    if not best_result:
+        print("⚠️  无法选择最优模型，使用第一个成功训练的模型")
+        best_result = results[0]
+    
+    print(f"✓ 最优模型：{{best_result['model_name']}}")
+    print(f"  评估指标：{{json.dumps(best_result['metrics'], indent=2)}}")
+    
+    # 保存所有模型结果
+    all_results = {{
         "prediction_id": "{prediction_id}",
         "timestamp": datetime.now().isoformat(),
         "target": TARGET,
-        "model_type": MODEL_TYPE,
-        "forecast": forecast.tolist(),
-        "statistics": {{
-            "mean": float(df['daily_metric'].mean()),
-            "std": float(df['daily_metric'].std())
+        "models_trained": len(results),
+        "all_models": [
+            {{
+                "name": r["model_name"],
+                "params": r["params"],
+                "metrics": r["metrics"]
+            }} for r in results
+        ],
+        "best_model": {{
+            "name": best_result["model_name"],
+            "params": best_result["params"],
+            "metrics": best_result["metrics"],
+            "forecast": best_result["forecast"]
+        }},
+        "forecast_summary": {{
+            "mean": float(np.mean(best_result["forecast"])),
+            "std": float(np.std(best_result["forecast"])),
+            "min": float(np.min(best_result["forecast"])),
+            "max": float(np.max(best_result["forecast"]))
         }}
     }}
     
-    with open(OUTPUT_FILE, 'w') as f:
-        json.dump(results, f, indent=2)
+    # 保存结果
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+        json.dump(all_results, f, indent=2, ensure_ascii=False, default=str)
     
-    print(f"预测完成：{{OUTPUT_FILE}}")
+    print(f"\\n✓ 预测完成，结果已保存：{{OUTPUT_FILE}}")
+    print("=" * 60)
+    
+    # 输出简要结果
+    print("\\n【预测摘要】")
+    print(f"最优模型：{{best_result['model_name']}}")
+    print(f"平均预测值：{{all_results['forecast_summary']['mean']:.2f}}")
+    print(f"预测范围：{{all_results['forecast_summary']['min']:.2f}} - {{all_results['forecast_summary']['max']:.2f}}")
+    
+    conn.close()
     return 0
 
 if __name__ == "__main__":
     sys.exit(main())
 '''
-    
-    # 写入脚本
+
+    # 写入脚本文件
     with open(script_file, 'w', encoding='utf-8') as f:
         f.write(script_content)
-    script_file.chmod(0o755)
     
-    # 生成配置
-    prediction_config = {
+    os.chmod(script_file, 0o755)
+    
+    # 返回配置信息
+    return {
         "prediction_id": prediction_id,
-        "timestamp": timestamp.isoformat(),
-        "target": target,
-        "model_type": model_type,
-        "parameters": parameters,
         "script_file": str(script_file),
         "output_file": str(output_file),
-        "status": "pending_confirmation"
+        "models_to_run": models_to_run,
+        "timestamp": timestamp.isoformat()
     }
-    
-    config_file = date_dir / f"{prediction_id}.json"
-    with open(config_file, 'w', encoding='utf-8') as f:
-        json.dump(prediction_config, f, indent=2, ensure_ascii=False)
-    
-    return prediction_config
 
 
 def main():
     parser = argparse.ArgumentParser(description="生成预测逻辑")
-    parser.add_argument("--target", "-t", required=True, help="预测目标")
-    parser.add_argument("--model", "-m", choices=["arima", "linear_regression"], default="arima", help="模型类型")
-    parser.add_argument("--p", type=int, default=1, help="ARIMA p 参数")
-    parser.add_argument("--d", type=int, default=1, help="ARIMA d 参数")
-    parser.add_argument("--q", type=int, default=1, help="ARIMA q 参数")
-    parser.add_argument("--periods", type=int, default=30, help="预测周期")
+    parser.add_argument("--target", "-t", required=True, help="预测目标描述")
+    parser.add_argument("--models", "-m", default="auto", 
+                       help="模型选择：auto（自动对比）/ arima / linear_regression / exponential_smoothing / prophet")
+    parser.add_argument("--periods", "-p", type=int, default=30, help="预测周期（天数）")
     parser.add_argument("--env-file", "-e", default=".env", help=".env 文件路径")
     parser.add_argument("--output", "-o", help="输出文件路径")
     
@@ -201,24 +449,19 @@ def main():
     }
     
     parameters = {
-        "p": args.p,
-        "d": args.d,
-        "q": args.q,
         "forecast_periods": args.periods
     }
     
     # 生成预测脚本
-    prediction_config = generate_script(args.target, args.model, parameters, config)
+    prediction_config = generate_script(args.target, args.models, parameters, config)
     
     # 输出
     result = {
         "success": True,
         "prediction_id": prediction_config["prediction_id"],
-        "target": prediction_config["target"],
-        "model_type": prediction_config["model_type"],
         "script_file": prediction_config["script_file"],
-        "output_file": prediction_config["output_file"],
-        "status": prediction_config["status"]
+        "models_to_run": prediction_config["models_to_run"],
+        "message": f"预测脚本已生成，支持 {len(prediction_config['models_to_run'])} 个模型自动对比"
     }
     
     if args.output:

@@ -112,26 +112,46 @@ python3 scripts/execute_query.py \
 
 ### generate_prediction.py
 
-生成预测分析脚本。
+生成预测分析脚本（支持多模型自动对比）。
+
+**支持的模型**：
+- `ARIMA` - 时间序列模型（适合有趋势/季节性的数据）
+- `线性回归` - 简单趋势预测
+- `指数平滑` - 短期预测
+- `Prophet` - Facebook 开源模型（适合复杂模式）
 
 **用法**:
 ```bash
+# 自动对比所有模型（推荐）
 python3 scripts/generate_prediction.py \
   --target "未来 30 天销售预测" \
-  --model arima \
+  --models auto \
+  --periods 30 \
+  --env-file .env
+
+# 指定单一模型
+python3 scripts/generate_prediction.py \
+  --target "未来 30 天销售预测" \
+  --models arima \
   --periods 30 \
   --env-file .env
 ```
 
 **参数**:
 - `--target`: 预测目标描述
-- `--model`: 模型类型（arima/linear）
-- `--periods`: 预测期数
+- `--models`: 模型选择
+  - `auto`（默认）- 自动训练所有可用模型，选择最优
+  - `arima` - 只使用 ARIMA
+  - `linear_regression` - 只使用线性回归
+  - `exponential_smoothing` - 只使用指数平滑
+  - `prophet` - 只使用 Prophet
+- `--periods`: 预测期数（天数）
 - `--env-file`: .env 文件路径
 
 **输出**:
 - 生成预测脚本文件
-- 返回预测配置 JSON
+- 返回预测配置 JSON（包含所有模型对比结果）
+- 自动选择 MSE/AIC 最优的模型作为最终预测
 
 ---
 
