@@ -1,10 +1,10 @@
 ---
 name: alibabacloud-rds-duckdb-analytics
 description: >-
-  Natural language data analytics for Alibaba Cloud RDS DuckDB instances. Provides text-to-SQL
-  query generation, ARIMA/linear regression prediction, query history persistence, and OpenClaw
-  cron scheduling. Use when user mentions: DuckDB分析, 数据查询, 自然语言问数, DuckDB预测,
-  数据分析, text-to-sql, /duckdb, 查询记录, 预测分析, DuckDB定时任务.
+ Natural language data analytics for Alibaba Cloud RDS DuckDB instances. Provides text-to-SQL
+ query generation, ARIMA/linear regression prediction, query history persistence, and OpenClaw
+ cron scheduling. Use when user mentions: DuckDB 分析，数据查询，自然语言问数，DuckDB 预测，
+ 数据分析，text-to-sql, /duckdb, 查询记录，预测分析，DuckDB 定时任务.
 metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3"] }, "homepage": "https://github.com/huanjizhou/alibabacloud-rds-duckdb-analytics-skill" } }
 ---
 
@@ -24,27 +24,64 @@ metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3"] }, 
 | 命令 | 功能 |
 |------|------|
 | `/duckdb 分析 <描述>` | 自然语言生成 SQL 并执行 |
-| `/duckdb 问数 <ID或关键词>` | 重用历史查询 |
+| `/duckdb 问数 <ID 或关键词>` | 重用历史查询 |
 | `/duckdb 运行预测 <描述>` | 创建并执行预测任务 |
 | `/duckdb 记录 [类型] [日期]` | 查看查询/预测历史 |
 | `/duckdb 配置 [子命令]` | 管理连接配置 |
 
 详细命令参数见 [references/commands.md](references/commands.md)。
 
+## 安装方式
+
+用户需要先将本技能安装到 OpenClaw 中（告知用户以下任一方式）：
+
+```bash
+# 方式 1：复制到 workspace skills 目录
+cp -r alibabacloud-rds-duckdb-analytics-skill ~/.openclaw/workspace/skills/
+
+# 方式 2：clone 到 skills 目录
+cd ~/.openclaw/workspace/skills && git clone https://github.com/huanjizhou/alibabacloud-rds-duckdb-analytics-skill
+```
+
+安装后 OpenClaw 自动发现该技能，用户发送任意 `/duckdb` 命令即可开始使用。
+
+## 前置检查规则（重要）
+
+**每次**收到 `/duckdb` 相关命令时，必须按以下顺序前置检查：
+
+1. **检查依赖**：执行 `bash {baseDir}/scripts/check_dependencies.sh`
+   - 未通过 → 进入 Phase A（A1 场景），完成后继续
+2. **检查 .env**：确认 `{baseDir}/.env` 存在且包含必要字段
+   - 不存在 → 进入 Phase A（A2 场景），完成后继续
+3. **测试连接**：执行 `python3 {baseDir}/scripts/read_config.py --env-file {baseDir}/.env`
+   - 失败 → 进入 Phase A（A3 场景），完成后继续
+
+**全部通过后**，再根据用户命令分发到对应 Phase。
+
+如果环境已就绪（此前已通过检查），可跳过前置检查，直接分发命令。
+
 ## 工作流程总览
 
 ```
-[用户首次使用]
-  │
-  ▼
-Phase A ─ 环境与连接配置（子 Agent: env-setup）
-  │
-  ▼
-[用户发送命令] ─┬─ /duckdb 分析    → Phase B（数据分析）
-                ├─ /duckdb 问数    → Phase B-2（查询复用）
-                ├─ /duckdb 运行预测 → Phase C（预测分析）
-                ├─ /duckdb 记录    → Phase D（查看记录）
-                └─ /duckdb 配置    → Phase A（重新配置）
+[用户发送 /duckdb 命令]
+ │
+ ▼
+前置检查 ─── 依赖？─✗──→ Phase A（A1: 自动安装）──→ 重新检查
+ │ │
+ ✓ │
+ ├─── .env? ──✗──→ Phase A（A2: 引导配置）──→ 重新检查 │
+ │ │
+ ✓ │
+ ├─── 连接？─✗──→ Phase A（A3: 排查连接）──→ 重新检查 │
+ │ │
+ ✓ 全部通过 ←──────────────────────────────────────────┘
+ │
+ ▼
+命令分发 ──┬─ /duckdb 分析 → Phase B（数据分析）
+ ├─ /duckdb 问数 → Phase B-2（查询复用）
+ ├─ /duckdb 运行预测 → Phase C（预测分析）
+ ├─ /duckdb 记录 → Phase D（查看记录）
+ └─ /duckdb 配置 → Phase A（重新配置）
 ```
 
 ---
@@ -105,12 +142,12 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 🔧 连接测试
 
 ❌ 连接失败
-   错误信息：{error_message}
+ 错误信息：{error_message}
 
 请检查：
-  • 实例地址和端口是否正确
-  • 用户名和密码是否正确
-  • 网络是否可达（白名单是否已添加）
+ • 实例地址和端口是否正确
+ • 用户名和密码是否正确
+ • 网络是否可达（白名单是否已添加）
 
 修改后请告诉我，我将重新测试。
 ```
@@ -126,9 +163,9 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 ✅ 数据库连接成功（{database}@{host}）
 
 您现在可以使用以下命令：
-  • /duckdb 分析 <问题描述>    — 自然语言查询
-  • /duckdb 运行预测 <目标>     — 预测分析
-  • /duckdb 记录               — 查看历史
+ • /duckdb 分析 <问题描述> — 自然语言查询
+ • /duckdb 运行预测 <目标> — 预测分析
+ • /duckdb 记录 — 查看历史
 ```
 
 ---
@@ -159,9 +196,9 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 {generated_sql}
 
 请确认：
-  • 回复「确认」→ 执行查询
-  • 回复「修改 XXX」→ 调整 SQL
-  • 回复「取消」→ 取消本次分析
+ • 回复「确认」→ 执行查询
+ • 回复「修改 XXX」→ 调整 SQL
+ • 回复「取消」→ 取消本次分析
 ```
 
 **B2 — 查询成功**
@@ -182,9 +219,9 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 ✅ 可通过 /duckdb 问数 {short_keyword} 复用此查询
 
 接下来可以：
-  • 回复「查看明细」→ 展示完整数据
-  • 回复「每天自动执行」→ 配置为定时任务
-  • 发送新请求 → 开始新的分析
+ • 回复「查看明细」→ 展示完整数据
+ • 回复「每天自动执行」→ 配置为定时任务
+ • 发送新请求 → 开始新的分析
 ```
 
 **B3 — 查询失败**
@@ -195,11 +232,11 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 📊 查询结果
 
 ❌ 执行失败
-   错误信息：{error_message}
+ 错误信息：{error_message}
 
 可能原因：
-  • 表名或字段名不存在
-  • SQL 语法错误
+ • 表名或字段名不存在
+ • SQL 语法错误
 
 回复「修改」可调整 SQL 后重试。
 ```
@@ -239,15 +276,15 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 📈 预测分析
 
 【预测方案】
-  • 预测目标：{target}
-  • 模型类型：{model}（ARIMA / 线性回归）
-  • 数据范围：{data_range}
-  • 预测周期：{periods}
+ • 预测目标：{target}
+ • 模型类型：{model}（ARIMA / 线性回归）
+ • 数据范围：{data_range}
+ • 预测周期：{periods}
 
 请确认：
-  • 回复「确认」→ 执行预测
-  • 回复「修改 XXX」→ 调整参数
-  • 回复「取消」→ 取消
+ • 回复「确认」→ 执行预测
+ • 回复「修改 XXX」→ 调整参数
+ • 回复「取消」→ 取消
 ```
 
 **C2 — 预测成功**
@@ -258,8 +295,8 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 📈 预测结果
 
 ✅ 预测完成
-  • 预测 ID：{prediction_id}
-  • 模型：{model}
+ • 预测 ID：{prediction_id}
+ • 模型：{model}
 
 【预测摘要】
 {预测结果的关键趋势和数值}
@@ -280,15 +317,15 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 📈 预测结果
 
 ❌ 预测失败
-   错误信息：{error_message}
+ 错误信息：{error_message}
 
 可能原因：
-  • 历史数据不足（至少需要 30 条）
-  • 数据格式不符合模型要求
+ • 历史数据不足（至少需要 30 条）
+ • 数据格式不符合模型要求
 
 建议：
-  • 增加数据范围
-  • 尝试更换模型：回复「修改 模型 linear_regression」
+ • 增加数据范围
+ • 尝试更换模型：回复「修改 模型 linear_regression」
 ```
 
 ---
@@ -310,11 +347,11 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 
 【查询记录】
 {按时间倒序列出，每条一行}
-  {序号}. {query_id} — {natural_language}（{row_count} 行, {execution_time_ms}ms）
+ {序号}. {query_id} — {natural_language}（{row_count} 行，{execution_time_ms}ms）
 
 【预测记录】
 {按时间倒序列出}
-  {序号}. {prediction_id} — {target}（{model}）
+ {序号}. {prediction_id} — {target}（{model}）
 
 共 {total} 条记录。可用 /duckdb 问数 <ID> 复用查询。
 ```
@@ -350,9 +387,9 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 ⏰ 定时任务配置
 
 请告诉我您期望的执行方案：
-  1. 执行频率：每天 / 每周 / 每月
-  2. 执行时间：如 08:00
-  3. 如选每周，请指定星期几
+ 1. 执行频率：每天 / 每周 / 每月
+ 2. 执行时间：如 08:00
+ 3. 如选每周，请指定星期几
 
 示例：「每天早上 8:00 执行」
 ```
@@ -363,13 +400,13 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 
 ```json
 {
-  "agents": {
-    "duckdb-prediction-cron": {
-      "cron": "{cron_expression}",
-      "message": "执行 DuckDB 预测任务：python3 {baseDir}/scripts/run_prediction.py --prediction-id {prediction_id} --env-file {baseDir}/.env",
-      "skill": "alibabacloud-rds-duckdb-analytics"
-    }
-  }
+ "agents": {
+ "duckdb-prediction-cron": {
+ "cron": "{cron_expression}",
+ "message": "执行 DuckDB 预测任务：python3 {baseDir}/scripts/run_prediction.py --prediction-id {prediction_id} --env-file {baseDir}/.env",
+ "skill": "alibabacloud-rds-duckdb-analytics"
+ }
+ }
 }
 ```
 
@@ -379,10 +416,10 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 ✅ 定时任务配置完成！
 
 📋 配置摘要：
-  • 任务：{prediction_target}
-  • 频率：{frequency}
-  • 执行时间：{time}
-  • Cron 表达式：{cron_expression}
+ • 任务：{prediction_target}
+ • 频率：{frequency}
+ • 执行时间：{time}
+ • Cron 表达式：{cron_expression}
 
 🔄 下次执行时间：{next_run_time}
 
@@ -397,14 +434,14 @@ Phase A ─ 环境与连接配置（子 Agent: env-setup）
 
 ```
 records/
-├── queries/                  # SQL 查询记录
-│   └── YYYY-MM-DD/
-│       └── query_{timestamp}_{hash}.json
-└── predictions/              # 预测分析记录
-    └── YYYY-MM-DD/
-        ├── pred_{id}.json    # 预测配置
-        ├── pred_{id}.py      # 预测脚本
-        └── results/          # 执行结果
+├── queries/ # SQL 查询记录
+│ └── YYYY-MM-DD/
+│ └── query_{timestamp}_{hash}.json
+└── predictions/ # 预测分析记录
+ └── YYYY-MM-DD/
+ ├── pred_{id}.json # 预测配置
+ ├── pred_{id}.py # 预测脚本
+ └── results/ # 执行结果
 ```
 
 ---
@@ -412,4 +449,7 @@ records/
 ## 参考文档
 
 - 命令详细参数与确认流程：[references/commands.md](references/commands.md)
-- 连接配置与故障排查：[references/configuration.md](references/configuration.md)
+- 连接配置说明：[references/configuration.md](references/configuration.md)
+- 脚本使用参考：[references/scripts.md](references/scripts.md)
+- 持久化记录格式：[references/record_format.md](references/record_format.md)
+- 故障排查指南：[references/troubleshooting.md](references/troubleshooting.md)
