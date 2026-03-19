@@ -71,7 +71,8 @@ def execute_query(sql: str, config: dict) -> dict:
             password=config["rds"]["password"],
             database=config["rds"]["database"],
             charset="utf8mb4",
-            cursorclass=pymysql.cursors.DictCursor
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=10  # 10 秒连接超时
         )
         
         logger.info(f"数据库连接成功：{config['rds']['host']}:{config['rds']['port']}")

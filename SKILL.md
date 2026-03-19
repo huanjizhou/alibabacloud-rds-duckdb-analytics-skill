@@ -123,8 +123,9 @@ cd ~/.openclaw/workspace/skills && git clone https://github.com/huanjizhou/aliba
 ❌ 未检测到数据库连接配置
 
 请提供 DuckDB 连接信息：
-  1. 实例地址（如：rm-xxx.duckdb.rds.aliyuncs.com）
-  2. 端口
+  1. 实例地址（如：rm-xxx.mysql.rds.aliyuncs.com）
+     ⚠️ 推荐使用公网地址，避免内网连接问题
+  2. 端口（默认：3306）
   3. 用户名
   4. 密码
   5. 数据库名
@@ -136,7 +137,7 @@ cd ~/.openclaw/workspace/skills && git clone https://github.com/huanjizhou/aliba
 
 **A3 — 连接失败**
 
-严格回复：
+严格回复（连接超时或失败）：
 
 ```
 🔧 连接测试
@@ -149,7 +150,25 @@ cd ~/.openclaw/workspace/skills && git clone https://github.com/huanjizhou/aliba
  • 用户名和密码是否正确
  • 网络是否可达（白名单是否已添加）
 
-修改后请告诉我，我将重新测试。
+【自动修复】
+检测到可能是白名单问题，是否授权我自动将本机 IP 加入实例白名单？
+ • 回复「是」→ 自动配置白名单（需要阿里云 CLI 授权）
+ • 回复「否」→ 手动配置（见下方说明）
+
+【手动配置白名单】
+1. 登录阿里云 RDS 控制台
+2. 进入实例详情页 → 白名单设置
+3. 添加本机公网 IP：{local_ip}
+4. 保存后回复「已配置」，我将重新测试
+```
+
+用户回答「是」后，执行以下命令自动添加白名单：
+```bash
+python3 {baseDir}/scripts/fix_whitelist.py \
+  --instance-id {instance_id} \
+  --region {region} \
+  --env-file {baseDir}/.env \
+  --test-connection
 ```
 
 **A4 — 环境就绪**
