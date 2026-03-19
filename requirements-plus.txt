@@ -1,0 +1,15 @@
+# Requirements for Plus Tier (V2.0)
+# 增强版依赖 - 自动特征工程 + 交叉验证
+
+# Include all Basic tier dependencies
+pymysql>=1.0.0
+pandas>=2.0.0
+pyyaml>=6.0
+requests>=2.28.0
+python-dotenv>=1.0.0
+statsmodels>=0.14.0
+scikit-learn>=1.0.0
+
+# Plus tier additions - Auto feature engineering & explainability
+pyod>=1.1.0
+shap>=0.44.0
