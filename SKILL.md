@@ -1,42 +1,14 @@
 ---
 name: alibabacloud-rds-duckdb-analytics
 description: >-
- Natural language data analytics for Alibaba Cloud RDS DuckDB instances. Provides text-to-SQL
- query generation, multi-tier prediction (Basic/Plus/Pro), query history persistence, and OpenClaw
- cron scheduling. Use when user mentions: DuckDB 分析，数据查询，自然语言问数，DuckDB 预测，
- 数据分析，text-to-sql, /duckdb, 查询记录，预测分析，DuckDB 定时任务.
+ 阿里云 RDS DuckDB 自然语言数据分析：text-to-SQL、多版本预测、定时任务。
+ 触发词：/duckdb, DuckDB 分析, 数据查询, 预测分析.
 metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3", "pip3", "aliyun"] }, "homepage": "https://github.com/huanjizhou/alibabacloud-rds-duckdb-analytics-skill" } }
 ---
 
 # Alibaba Cloud RDS DuckDB 数据分析技能
 
 本技能采用「主 Agent + 子 Agent」协作协议，为 RDS DuckDB 用户提供自然语言问数、预测分析和定时任务能力。
-
-## 🎯 多版本架构
-
-本技能采用**渐进式版本架构**，根据用户需求自动推荐合适的版本层级：
-
-| 版本 | 代号 | 核心特性 | 适用场景 |
-|------|------|----------|----------|
-| 🟢 **Basic** | V1.0 | 经典模型快速预测 | 日常数据分析、简单趋势预测 |
-| 🔵 **Plus** | V2.0 | 自动特征工程 + 交叉验证 | 生产环境、需要可解释性 |
-| 🟣 **Pro** | V3.0 | 深度学习 + 持续进化 | 复杂时序、高精度要求 |
-
-**版本选择命令：**
-```bash
-/duckdb 配置 查看版本          # 查看当前版本
-/duckdb 配置 升级 plus         # 升级到 Plus 版
-/duckdb 配置 升级 pro          # 升级到 Pro 版
-/duckdb 配置 降级 basic        # 降级到 Basic 版
-```
-
-**智能推荐逻辑：**
-- 系统会根据用户请求的复杂度自动推荐版本
-- 简单查询/预测 → Basic 版
-- 需要模型解释/特征分析 → Plus 版
-- 深度学习/因果推断 → Pro 版
-
-详细说明见 [references/tier_comparison.md](references/tier_comparison.md)。
 
 ## 协议约定
 
@@ -55,13 +27,6 @@ metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3", "pi
 | `/duckdb 记录 [类型] [日期]` | 查看查询/预测历史 |
 | `/duckdb 配置 [子命令]` | 管理连接配置、版本切换 |
 
-**版本管理命令：**
-| 命令 | 功能 |
-|------|------|
-| `/duckdb 配置 查看版本` | 查看当前版本层级 |
-| `/duckdb 配置 升级 plus/pro` | 升级到 Plus 或 Pro 版 |
-| `/duckdb 配置 降级 basic` | 降级到 Basic 版 |
-
 详细命令参数见 [references/commands.md](references/commands.md)。
 
 ## 安装方式
@@ -78,22 +43,7 @@ cd ~/.openclaw/workspace/skills && git clone https://github.com/huanjizhou/aliba
 
 安装后 OpenClaw 自动发现该技能，用户发送任意 `/duckdb` 命令即可开始使用。
 
-### 版本依赖安装
-
-根据选择的版本层级，安装对应的依赖：
-
-```bash
-# Basic 版（默认）
-pip3 install -r requirements-basic.txt
-
-# Plus 版（推荐生产环境）
-pip3 install -r requirements-plus.txt
-
-# Pro 版（深度学习 + 因果推断）
-pip3 install -r requirements-pro.txt
-```
-
-**默认使用 Basic 版**，确保向后兼容。用户可随时升级。
+默认安装 Basic 版依赖（`pip3 install -r requirements-basic.txt`）。如需预测增强版本（Plus/Pro），见下方 Phase C 的「多版本架构」章节。
 
 ## 前置检查规则（重要）
 
@@ -114,24 +64,24 @@ pip3 install -r requirements-pro.txt
 
 ```
 [用户发送 /duckdb 命令]
- │
- ▼
-前置检查 ─── 依赖？─✗──→ Phase A（A1: 自动安装）──→ 重新检查
- │ │
- ✓ │
- ├─── .env? ──✗──→ Phase A（A2: 引导配置）──→ 重新检查 │
- │ │
- ✓ │
- ├─── 连接？─✗──→ Phase A（A3: 排查连接）──→ 重新检查 │
- │ │
- ✓ 全部通过 ←──────────────────────────────────────────┘
- │
- ▼
-命令分发 ──┬─ /duckdb 分析 → Phase B（数据分析）
- ├─ /duckdb 问数 → Phase B-2（查询复用）
- ├─ /duckdb 运行预测 → Phase C（预测分析）
- ├─ /duckdb 记录 → Phase D（查看记录）
- └─ /duckdb 配置 → Phase A（重新配置）
+       │
+       ▼
+  前置检查 ── 依赖？ ─✗─→ Phase A（A1: 自动安装）─┐
+       │                                           │
+       ✓                                           │
+       ├── .env？ ─✗─→ Phase A（A2: 引导配置）─────┤
+       │                                           │
+       ✓                                           │
+       ├── 连接？ ─✗─→ Phase A（A3: 排查连接）─────┤
+       │                                           │
+       ✓ 全部通过 ←────────────────────────────────┘
+       │
+       ▼
+  命令分发 ─┬─ /duckdb 分析     → Phase B（数据分析）
+            ├─ /duckdb 问数     → Phase B-2（查询复用）
+            ├─ /duckdb 运行预测 → Phase C（预测分析）
+            ├─ /duckdb 记录     → Phase D（查看记录）
+            └─ /duckdb 配置     → Phase A（重新配置）
 ```
 
 ---
@@ -175,7 +125,7 @@ pip3 install -r requirements-pro.txt
 请提供 DuckDB 连接信息：
   1. 实例地址（如：rm-xxx.mysql.rds.aliyuncs.com）
      ⚠️ 推荐使用公网地址，避免内网连接问题
-  2. 端口（默认：3306）
+  2. 端口
   3. 用户名
   4. 密码
   5. 数据库名
@@ -328,6 +278,20 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 **执行者**：子 Agent `prediction-runner`
 
+### 多版本架构
+
+预测功能支持三个版本层级，按需升级：
+
+| 版本 | 核心特性 | 依赖文件 |
+|------|----------|----------|
+| 🟢 Basic（默认） | ARIMA / 线性回归 / Lasso / 指数平滑 / Prophet | `requirements-basic.txt` |
+| 🔵 Plus | + 自动特征工程、交叉验证、SHAP 解释 | `requirements-plus.txt` |
+| 🟣 Pro | + 深度学习 (LSTM/Transformer)、因果推断 | `requirements-pro.txt` |
+
+版本管理命令：`/duckdb 配置 查看版本` · `/duckdb 配置 升级 plus` · `/duckdb 配置 降级 basic`
+
+详细对比见 [references/tier_comparison.md](references/tier_comparison.md)。
+
 ### 步骤
 
 1. 解析预测目标
@@ -346,37 +310,14 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 【预测方案】
  • 预测目标：{target}
- • 当前版本：{current_tier}（🟢 Basic / 🔵 Plus / 🟣 Pro）
- • 模型选择：自动对比（根据版本选择可用模型）
+ • 当前版本：{current_tier}
+ • 模型选择：自动对比所有可用模型
  • 数据范围：{data_range}
  • 预测周期：{periods} 天
- • 评估指标：MSE（均方误差）/ AIC（赤池信息量）
+ • 评估指标：MSE / AIC
 
-【支持的模型】
-🟢 Basic 版：
- • ARIMA - 时间序列模型（适合有趋势/季节性的数据）
- • 线性回归 - 简单趋势预测
- • Lasso 回归 - 带特征选择和正则化（适合多特征场景）
- • 指数平滑 - 短期预测
- • Prophet - Facebook 开源模型（适合复杂模式）
-
-🔵 Plus 版（新增）：
- • 自动特征工程 - 自动识别和构造有效特征
- • 交叉验证 - 更可靠的模型评估
- • 异常检测 (PyOD) - 识别数据中的异常模式
- • SHAP 解释 - 理解模型决策依据
-
-🟣 Pro 版（新增）：
- • 深度学习 (LSTM/Transformer) - 复杂时序建模
- • PyTorch Forecasting - 先进时序预测架构
- • 因果推断 (DoWhy) - 评估干预措施效果
- • 持续学习 - 模型随新数据自动更新
-
-系统会自动训练所有可用模型，选择误差最小的作为最优模型。
-
-💡 版本提示：
- • 如需特征工程/模型解释 → 升级到 Plus 版：`/duckdb 配置 升级 plus`
- • 如需深度学习/因果推断 → 升级到 Pro 版：`/duckdb 配置 升级 pro`
+系统自动训练当前版本所有可用模型，选择误差最小的作为最优模型。
+如需更多模型能力，可升级版本：/duckdb 配置 升级 plus
 
 请确认：
  • 回复「确认」→ 执行预测
@@ -393,33 +334,23 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 ✅ 预测完成
  • 预测 ID：{prediction_id}
- • 使用版本：{current_tier}（🟢 Basic / 🔵 Plus / 🟣 Pro）
+ • 使用版本：{current_tier}
  • 训练模型数：{models_trained} 个
  • 最优模型：{best_model_name}
 
 【模型对比】
-{列出所有训练模型的评估指标}
  1. {model_1_name}: MSE={mse_1}, MAE={mae_1}
  2. {model_2_name}: MSE={mse_2}, MAE={mae_2}
  ...
 
 【最优模型预测摘要】
-{预测结果的关键趋势和数值}
  • 平均预测值：{mean_forecast}
  • 预测范围：{min_forecast} - {max_forecast}
  • 标准差：{std_forecast}
-
-{Plus/Pro 版特有内容}
-{如使用 Plus 版：
- • 特征重要性：{top_features}
- • SHAP 解释：{shap_summary}}
-{如使用 Pro 版：
- • 深度学习架构：{dl_architecture}
- • 因果效应：{causal_effect}}
+{Plus/Pro 版会额外显示特征重要性、SHAP 解释或因果效应等}
 
 【记录保存】
-✅ 所有模型结果已保存
-✅ 可通过 /duckdb 运行预测 {prediction_id} 重新执行
+✅ 已保存，可通过 /duckdb 运行预测 {prediction_id} 重新执行
 
 是否配置为定时任务？（是/否）
 ```
@@ -547,19 +478,7 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 ## 持久化记录
 
-所有查询和预测自动保存到 `{baseDir}/records/`：
-
-```
-records/
-├── queries/ # SQL 查询记录
-│ └── YYYY-MM-DD/
-│ └── query_{timestamp}_{hash}.json
-└── predictions/ # 预测分析记录
- └── YYYY-MM-DD/
- ├── pred_{id}.json # 预测配置
- ├── pred_{id}.py # 预测脚本
- └── results/ # 执行结果
-```
+所有查询和预测自动保存到 `{baseDir}/records/`（`queries/` 和 `predictions/` 按日期分目录）。详细格式见 [references/record_format.md](references/record_format.md)。
 
 ---
 
