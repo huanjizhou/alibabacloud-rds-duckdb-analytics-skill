@@ -72,7 +72,7 @@ install_aliyun_cli() {
                 echo -e "${YELLOW}⚠${NC} Homebrew 未安装，尝试手动下载..."
                 ARCH=$(uname -m)
                 if [ "$ARCH" = "arm64" ]; then
-                    CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-arm64-amd64.zip"
+                    CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-arm64.zip"
                 else
                     CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-amd64.zip"
                 fi

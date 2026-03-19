@@ -54,10 +54,12 @@ def run_script(script_file):
 
 def load_prediction_config(prediction_id, config):
     """加载预测配置"""
-    # 在预测目录中查找
     predictions_dir = Path(config["records_dir"]) / "predictions"
     
-    for date_dir in predictions_dir.iterdir():
+    if not predictions_dir.exists():
+        return None
+    
+    for date_dir in sorted(predictions_dir.iterdir(), reverse=True):
         if not date_dir.is_dir():
             continue
         

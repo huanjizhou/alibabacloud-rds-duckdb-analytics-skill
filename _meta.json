@@ -1,6 +1,6 @@
 {
   "name": "alibabacloud-rds-duckdb-analytics",
-  "version": "1.0.0",
+  "skill_version": "1.0.0",
   "tiers": ["basic", "plus", "pro"],
   "default_tier": "basic",
   "auto_upgrade": true

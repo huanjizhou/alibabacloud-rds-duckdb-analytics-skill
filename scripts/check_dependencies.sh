@@ -65,8 +65,7 @@ echo ""
 echo "=== Python 包检查 | Python Packages Check ==="
 check_python_package "pymysql"
 check_python_package "pandas"
-check_python_package "yaml"
-check_python_package "requests"
+check_python_package "dotenv"
 
 # 检查阿里云凭证
 echo ""

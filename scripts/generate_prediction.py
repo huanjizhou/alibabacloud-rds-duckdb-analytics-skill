@@ -143,10 +143,13 @@ def train_arima(df, forecast_periods):
         model_fit = model.fit()
         forecast = model_fit.forecast(steps=forecast_periods)
         
-        # 计算训练误差
+        # 计算训练误差（sklearn 可能未安装，用 numpy 兜底）
         predictions = model_fit.predict(start=len(data)-30, end=len(data)-1)
         actual = data.iloc[-30:]
-        mse = mean_squared_error(actual, predictions) if len(predictions) == len(actual) else float('inf')
+        if len(predictions) == len(actual):
+            mse = float(np.mean((np.array(actual) - np.array(predictions)) ** 2))
+        else:
+            mse = float('inf')
         
         return {{
             "model_name": "ARIMA",
