@@ -49,7 +49,7 @@ from pathlib import Path
 from datetime import datetime
 
 try:
-    import duckdb
+    import pymysql
     import pandas as pd
     import numpy as np
 except ImportError as e:
@@ -67,15 +67,34 @@ except ImportError:
     LinearRegression = None
 
 def main():
-    DUCKDB_PATH = "{config['duckdb']['database']}"
     OUTPUT_FILE = "{output_file}"
     MODEL_TYPE = "{model_type}"
     TARGET = "{target}"
     
-    print(f"开始预测：{{TARGET}}")
+    # 从环境变量读取配置
+    import os
+    from dotenv import load_dotenv
+    load_dotenv("{config.get('env_file', '.env')}")
     
-    # 连接数据库
-    conn = duckdb.connect(DUCKDB_PATH)
+    RDS_HOST = os.getenv("DUCKDB_HOST")
+    RDS_PORT = int(os.getenv("DUCKDB_PORT", "3306"))
+    RDS_USER = os.getenv("DUCKDB_USER")
+    RDS_PASSWORD = os.getenv("DUCKDB_PASSWORD")
+    RDS_DATABASE = os.getenv("DUCKDB_DATABASE")
+    
+    print(f"开始预测：{{TARGET}}")
+    print(f"连接 RDS: {{RDS_HOST}}:{{RDS_PORT}}")
+    
+    # 通过 MySQL 协议连接 RDS (DuckDB FDW)
+    conn = pymysql.connect(
+        host=RDS_HOST,
+        port=RDS_PORT,
+        user=RDS_USER,
+        password=RDS_PASSWORD,
+        database=RDS_DATABASE,
+        charset="utf8mb4",
+        connect_timeout=10
+    )
     
     # 加载历史数据（通用查询示例）
     query = """
@@ -170,10 +189,15 @@ def main():
     # 加载配置
     load_dotenv(args.env_file)
     config = {
-        "duckdb": {
+        "rds": {
+            "host": os.getenv("DUCKDB_HOST"),
+            "port": int(os.getenv("DUCKDB_PORT", "3306")),
+            "user": os.getenv("DUCKDB_USER"),
+            "password": os.getenv("DUCKDB_PASSWORD"),
             "database": os.getenv("DUCKDB_DATABASE")
         },
-        "records_dir": os.getenv("RECORDS_DIR", "/home/admin/.openclaw/workspace/skills/alibabacloud-rds-duckdb-analytics-skill/records")
+        "records_dir": os.getenv("RECORDS_DIR", "/home/admin/.openclaw/workspace/skills/alibabacloud-rds-duckdb-analytics-skill/records"),
+        "env_file": args.env_file
     }
     
     parameters = {

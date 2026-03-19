@@ -74,23 +74,8 @@ install_aliyun_cli() {
     echo "请运行配置：aliyun configure"
 }
 
-# 安装 DuckDB
-install_duckdb() {
-    echo ""
-    echo "=== 安装 DuckDB | Installing DuckDB ==="
-    
-    if command -v duckdb &> /dev/null; then
-        echo -e "${GREEN}✓${NC} DuckDB 已安装"
-        return
-    fi
-    
-    # 下载 DuckDB CLI
-    curl -Lo duckdb https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip
-    unzip duckdb.zip
-    sudo mv duckdb /usr/local/bin/
-    rm -rf duckdb.zip duckdb_cli-linux-amd64.zip
-    echo -e "${GREEN}✓${NC} DuckDB 安装完成"
-}
+# 注意：不需要安装本地 DuckDB
+# 本技能通过 MySQL 协议连接 RDS DuckDB FDW
 
 # 安装 Python 包
 install_python_packages() {
@@ -100,12 +85,13 @@ install_python_packages() {
     pip3 install --upgrade pip
     
     pip3 install \
-        duckdb>=0.9.0 \
         pymysql>=1.0.0 \
         pandas>=2.0.0 \
         pyyaml>=6.0 \
         requests>=2.28.0 \
-        sqlalchemy>=2.0.0
+        python-dotenv>=1.0.0 \
+        statsmodels>=0.14.0 \
+        scikit-learn>=1.0.0
     
     echo -e "${GREEN}✓${NC} Python 包安装完成"
 }
@@ -122,7 +108,6 @@ fi
 
 install_system_packages
 install_aliyun_cli
-install_duckdb
 install_python_packages
 
 echo ""

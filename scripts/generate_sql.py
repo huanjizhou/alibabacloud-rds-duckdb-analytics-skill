@@ -23,6 +23,12 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
+try:
+    import pymysql
+except ImportError:
+    logger.error("需要安装 pymysql：pip install pymysql")
+    sys.exit(1)
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -31,15 +37,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-try:
-    import duckdb
-except ImportError:
-    logger.error("需要安装 duckdb：pip install duckdb")
-    sys.exit(1)
-
 
 class SQLGenerator:
-    """SQL 生成器"""
+    """SQL 生成器 - 通过 MySQL 协议连接 RDS DuckDB FDW"""
     
     def __init__(self, config):
         self.config = config
@@ -47,18 +47,23 @@ class SQLGenerator:
         self.schema_info = {}
         
     def connect(self):
-        """连接到 DuckDB"""
+        """连接到 RDS MySQL (DuckDB FDW)"""
         try:
-            duckdb_config = self.config["duckdb"]
-            logger.info(f"正在连接 DuckDB: {duckdb_config['host']}:{duckdb_config['port']}")
-            self.connection = duckdb.connect(duckdb_config["database"])
-            logger.info("DuckDB 连接成功")
+            rds_config = self.config["rds"]
+            logger.info(f"正在连接 RDS: {rds_config['host']}:{rds_config['port']}")
+            self.connection = pymysql.connect(
+                host=rds_config["host"],
+                port=rds_config["port"],
+                user=rds_config["user"],
+                password=rds_config["password"],
+                database=rds_config["database"],
+                charset="utf8mb4",
+                connect_timeout=10
+            )
+            logger.info("RDS 连接成功")
             return True
-        except duckdb.IOException as e:
-            logger.error(f"数据库文件不存在或无法访问：{duckdb_config.get('database', 'unknown')}")
-            return False
-        except duckdb.CatalogException as e:
-            logger.error(f"数据库结构错误：{e}")
+        except pymysql.Error as e:
+            logger.error(f"连接失败：{e}")
             return False
         except Exception as e:
             logger.error(f"连接失败：{e}")

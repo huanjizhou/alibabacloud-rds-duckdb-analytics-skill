@@ -5,7 +5,7 @@ description: >-
  query generation, ARIMA/linear regression prediction, query history persistence, and OpenClaw
  cron scheduling. Use when user mentions: DuckDB 分析，数据查询，自然语言问数，DuckDB 预测，
  数据分析，text-to-sql, /duckdb, 查询记录，预测分析，DuckDB 定时任务.
-metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3"] }, "homepage": "https://github.com/huanjizhou/alibabacloud-rds-duckdb-analytics-skill" } }
+metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3", "pip3", "aliyun"] }, "homepage": "https://github.com/huanjizhou/alibabacloud-rds-duckdb-analytics-skill" } }
 ---
 
 # Alibaba Cloud RDS DuckDB 数据分析技能
