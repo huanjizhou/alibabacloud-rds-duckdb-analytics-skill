@@ -40,7 +40,7 @@ def generate_script(target, model_type, parameters, config):
     
     # 支持的模型列表
     if model_type == "auto":
-        models_to_run = ["arima", "linear_regression", "exponential_smoothing", "prophet"]
+        models_to_run = ["arima", "linear_regression", "lasso", "exponential_smoothing", "prophet"]
     else:
         models_to_run = [model_type]
     
@@ -77,12 +77,13 @@ except ImportError:
     print("⚠️  statsmodels 未安装，跳过 ARIMA/指数平滑模型")
 
 try:
-    from sklearn.linear_model import LinearRegression
+    from sklearn.linear_model import LinearRegression, Lasso
     from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.preprocessing import StandardScaler
     LINEAR_REGRESSION_AVAILABLE = True
 except ImportError:
     LINEAR_REGRESSION_AVAILABLE = False
-    print("⚠️  scikit-learn 未安装，跳过线性回归模型")
+    print("⚠️  scikit-learn 未安装，跳过线性回归/Lasso 模型")
 
 try:
     from prophet import Prophet
@@ -183,6 +184,86 @@ def train_linear_regression(df, forecast_periods):
         }}
     except Exception as e:
         print(f"  线性回归训练失败：{{e}}")
+        return None
+
+
+def train_lasso(df, forecast_periods):
+    """Lasso 回归模型（带 L1 正则化）"""
+    if not LINEAR_REGRESSION_AVAILABLE:
+        return None
+    
+    try:
+        print("  训练 Lasso 回归模型...")
+        df_copy = df.copy()
+        
+        # 构建更多特征（提高 Lasso 的价值）
+        df_copy['day_index'] = range(len(df_copy))
+        df_copy['day_squared'] = df_copy['day_index'] ** 2
+        df_copy['rolling_mean_7'] = df_copy['daily_metric'].rolling(window=7, min_periods=1).mean()
+        df_copy['rolling_std_7'] = df_copy['daily_metric'].rolling(window=7, min_periods=1).std()
+        
+        # 填充 NaN
+        df_copy = df_copy.fillna(method='bfill').fillna(method='ffill')
+        
+        feature_cols = ['day_index', 'day_squared', 'rolling_mean_7', 'rolling_std_7']
+        X = df_copy[feature_cols].values
+        y = df_copy['daily_metric'].values
+        
+        # 标准化特征
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        # 自动选择最优 alpha 参数
+        print("    自动选择最优 alpha 参数...")
+        best_alpha = 0.001
+        best_mse = float('inf')
+        
+        for alpha in [0.0001, 0.001, 0.01, 0.1, 1.0]:
+            model = Lasso(alpha=alpha, max_iter=10000)
+            model.fit(X_scaled, y)
+            predictions = model.predict(X_scaled)
+            mse = mean_squared_error(y, predictions)
+            if mse < best_mse:
+                best_mse = mse
+                best_alpha = alpha
+        
+        print(f"    最优 alpha: {{best_alpha}}")
+        
+        # 使用最优 alpha 重新训练
+        model = Lasso(alpha=best_alpha, max_iter=10000)
+        model.fit(X_scaled, y)
+        
+        # 预测未来
+        future_indices = np.arange(len(df), len(df) + forecast_periods)
+        future_features = np.zeros((forecast_periods, len(feature_cols)))
+        future_features[:, 0] = future_indices  # day_index
+        future_features[:, 1] = future_indices ** 2  # day_squared
+        future_features[:, 2] = df_copy['rolling_mean_7'].iloc[-1]  # 使用最后的滚动均值
+        future_features[:, 3] = df_copy['rolling_std_7'].iloc[-1]  # 使用最后的滚动标准差
+        
+        future_features_scaled = scaler.transform(future_features)
+        forecast = model.predict(future_features_scaled)
+        
+        # 计算训练误差
+        predictions = model.predict(X_scaled)
+        mse = mean_squared_error(y, predictions)
+        mae = mean_absolute_error(y, predictions)
+        
+        # 计算非零系数（特征选择）
+        non_zero_coefs = np.sum(model.coef_ != 0)
+        
+        return {{
+            "model_name": "Lasso Regression",
+            "forecast": forecast.tolist(),
+            "params": {{
+                "alpha": best_alpha,
+                "non_zero_coefs": int(non_zero_coefs),
+                "coef": [float(c) for c in model.coef_]
+            }},
+            "metrics": {{"mse": mse, "mae": mae, "r2": float(model.score(X_scaled, y))}}
+        }}
+    except Exception as e:
+        print(f"  Lasso 训练失败：{{e}}")
         return None
 
 
@@ -332,6 +413,11 @@ def main():
     
     if "linear_regression" in models_to_train:
         result = train_linear_regression(df, FORECAST_PERIODS)
+        if result:
+            results.append(result)
+    
+    if "lasso" in models_to_train:
+        result = train_lasso(df, FORECAST_PERIODS)
         if result:
             results.append(result)
     

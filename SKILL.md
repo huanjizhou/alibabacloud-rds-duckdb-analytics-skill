@@ -304,6 +304,7 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 【支持的模型】
  • ARIMA - 时间序列模型（适合有趋势/季节性的数据）
  • 线性回归 - 简单趋势预测
+ • Lasso 回归 - 带特征选择和正则化（适合多特征场景）
  • 指数平滑 - 短期预测
  • Prophet - Facebook 开源模型（适合复杂模式）
 

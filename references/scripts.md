@@ -117,6 +117,7 @@ python3 scripts/execute_query.py \
 **支持的模型**：
 - `ARIMA` - 时间序列模型（适合有趋势/季节性的数据）
 - `线性回归` - 简单趋势预测
+- `Lasso 回归` - 带 L1 正则化和特征选择（适合多特征场景）
 - `指数平滑` - 短期预测
 - `Prophet` - Facebook 开源模型（适合复杂模式）
 
@@ -143,6 +144,7 @@ python3 scripts/generate_prediction.py \
   - `auto`（默认）- 自动训练所有可用模型，选择最优
   - `arima` - 只使用 ARIMA
   - `linear_regression` - 只使用线性回归
+  - `lasso` - 只使用 Lasso 回归
   - `exponential_smoothing` - 只使用指数平滑
   - `prophet` - 只使用 Prophet
 - `--periods`: 预测期数（天数）
