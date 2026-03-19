@@ -64,12 +64,39 @@ install_aliyun_cli() {
         return
     fi
     
-    curl -Lo aliyun-cli.zip https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-linux-3.0.44-amd64.zip
-    unzip aliyun-cli.zip
-    sudo mv aliyun /usr/local/bin/
-    rm -rf aliyun-cli.zip aliyun
-    echo -e "${GREEN}✓${NC} 阿里云 CLI 安装完成"
+    case $OS in
+        macos)
+            if command -v brew &> /dev/null; then
+                brew install aliyun-cli
+            else
+                echo -e "${YELLOW}⚠${NC} Homebrew 未安装，尝试手动下载..."
+                ARCH=$(uname -m)
+                if [ "$ARCH" = "arm64" ]; then
+                    CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-arm64-amd64.zip"
+                else
+                    CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-amd64.zip"
+                fi
+                curl -Lo aliyun-cli.zip "$CLI_URL"
+                unzip aliyun-cli.zip
+                sudo mv aliyun /usr/local/bin/
+                rm -rf aliyun-cli.zip aliyun
+            fi
+            ;;
+        *)
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+                CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-linux-arm64.zip"
+            else
+                CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-linux-3.0.44-amd64.zip"
+            fi
+            curl -Lo aliyun-cli.zip "$CLI_URL"
+            unzip aliyun-cli.zip
+            sudo mv aliyun /usr/local/bin/
+            rm -rf aliyun-cli.zip aliyun
+            ;;
+    esac
     
+    echo -e "${GREEN}✓${NC} 阿里云 CLI 安装完成"
     echo ""
     echo "请运行配置：aliyun configure"
 }

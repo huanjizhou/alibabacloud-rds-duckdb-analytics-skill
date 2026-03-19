@@ -1,4 +1,4 @@
-# Requirements for Pro Tier (V3.0)
+# Requirements for Pro Tier
 # 专业版依赖 - 深度学习 + 持续进化
 
 # Include all Plus tier dependencies

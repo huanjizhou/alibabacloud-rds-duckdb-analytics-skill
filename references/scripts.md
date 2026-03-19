@@ -126,6 +126,7 @@ python3 scripts/execute_query.py \
 # 自动对比所有模型（推荐）
 python3 scripts/generate_prediction.py \
   --target "未来 30 天销售预测" \
+  --table orders --date-column order_date --metric-column order_amount \
   --models auto \
   --periods 30 \
   --env-file .env
@@ -133,6 +134,7 @@ python3 scripts/generate_prediction.py \
 # 指定单一模型
 python3 scripts/generate_prediction.py \
   --target "未来 30 天销售预测" \
+  --table orders --metric-column order_amount \
   --models arima \
   --periods 30 \
   --env-file .env
@@ -140,6 +142,9 @@ python3 scripts/generate_prediction.py \
 
 **参数**:
 - `--target`: 预测目标描述
+- `--table`: 数据表名（默认：your_table）
+- `--date-column`: 日期列名（默认：created_at）
+- `--metric-column`: 指标列名（默认：metric_value）
 - `--models`: 模型选择
   - `auto`（默认）- 自动训练所有可用模型，选择最优
   - `arima` - 只使用 ARIMA

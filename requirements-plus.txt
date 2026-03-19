@@ -1,4 +1,4 @@
-# Requirements for Plus Tier (V2.0)
+# Requirements for Plus Tier
 # 增强版依赖 - 自动特征工程 + 交叉验证
 
 # Include all Basic tier dependencies

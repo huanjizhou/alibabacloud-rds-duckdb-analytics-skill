@@ -199,27 +199,36 @@ def main():
     load_dotenv(args.env_file)
     config = {
         "rds": {
-            "host": os.getenv("RDS_HOST"),
-            "port": int(os.getenv("RDS_PORT", "3306")),
-            "user": os.getenv("RDS_USER"),
-            "password": os.getenv("RDS_PASSWORD"),
-            "database": os.getenv("RDS_DATABASE")
+            "host": os.getenv("DUCKDB_HOST"),
+            "port": int(os.getenv("DUCKDB_PORT", "3306")),
+            "user": os.getenv("DUCKDB_USER"),
+            "password": os.getenv("DUCKDB_PASSWORD"),
+            "database": os.getenv("DUCKDB_DATABASE")
         },
         "records_dir": os.getenv("RECORDS_DIR", "/home/admin/.openclaw/workspace/skills/alibabacloud-rds-duckdb-analytics-skill/records")
     }
     
     # 验证 RDS 配置
     if not all([config["rds"]["host"], config["rds"]["user"], config["rds"]["password"]]):
-        logger.error("RDS 配置不完整，请检查 .env 文件中的 RDS_HOST/RDS_USER/RDS_PASSWORD")
+        logger.error("RDS 配置不完整，请检查 .env 文件中的 DUCKDB_HOST/DUCKDB_USER/DUCKDB_PASSWORD")
         return 1
     
     # 获取 SQL
     if args.query_id:
-        # 从记录文件读取 SQL
-        timestamp = datetime.now()
-        record_file = Path(config["records_dir"]) / "queries" / timestamp.strftime("%Y-%m-%d") / f"{args.query_id}.json"
+        # 从记录文件读取 SQL（遍历所有日期目录）
+        queries_dir = Path(config["records_dir"]) / "queries"
+        record_file = None
         
-        if not record_file.exists():
+        if queries_dir.exists():
+            for date_dir in sorted(queries_dir.iterdir(), reverse=True):
+                if not date_dir.is_dir():
+                    continue
+                candidate = date_dir / f"{args.query_id}.json"
+                if candidate.exists():
+                    record_file = candidate
+                    break
+        
+        if not record_file:
             logger.error(f"错误：记录不存在 {args.query_id}")
             return 1
         

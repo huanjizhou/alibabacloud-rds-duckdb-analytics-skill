@@ -1,4 +1,4 @@
-# Requirements for Basic Tier (V1.0)
+# Requirements for Basic Tier
 # 基础版依赖 - 经典模型快速预测
 
 # Core dependencies

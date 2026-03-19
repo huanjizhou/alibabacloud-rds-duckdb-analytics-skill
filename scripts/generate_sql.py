@@ -23,12 +23,6 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
-try:
-    import pymysql
-except ImportError:
-    logger.error("需要安装 pymysql：pip install pymysql")
-    sys.exit(1)
-
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +30,12 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
+try:
+    import pymysql
+except ImportError:
+    logger.error("需要安装 pymysql：pip install pymysql")
+    sys.exit(1)
 
 
 class SQLGenerator:
@@ -49,7 +49,7 @@ class SQLGenerator:
     def connect(self):
         """连接到 RDS MySQL (DuckDB FDW)"""
         try:
-            rds_config = self.config["rds"]
+            rds_config = self.config["duckdb"]
             logger.info(f"正在连接 RDS: {rds_config['host']}:{rds_config['port']}")
             self.connection = pymysql.connect(
                 host=rds_config["host"],
@@ -73,27 +73,31 @@ class SQLGenerator:
         """加载数据库 Schema 信息"""
         try:
             logger.info("正在加载数据库 Schema...")
-            tables_result = self.connection.execute("""
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_schema = 'main'
-            """).fetchall()
-            
-            logger.info(f"发现 {len(tables_result)} 个表")
-            
-            for table_row in tables_result:
-                table_name = table_row[0]
-                columns_result = self.connection.execute(f"""
-                    SELECT column_name, data_type 
-                    FROM information_schema.columns
-                    WHERE table_name = '{table_name}'
-                    ORDER BY ordinal_position
-                """).fetchall()
+            with self.connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT table_name FROM information_schema.tables 
+                    WHERE table_schema = DATABASE()
+                """)
+                tables_result = cursor.fetchall()
                 
-                self.schema_info[table_name] = [
-                    {"name": col[0], "type": col[1]}
-                    for col in columns_result
-                ]
-                logger.debug(f"表 {table_name}: {len(columns_result)} 个字段")
+                logger.info(f"发现 {len(tables_result)} 个表")
+                
+                for table_row in tables_result:
+                    table_name = table_row[0]
+                    cursor.execute(
+                        "SELECT column_name, data_type "
+                        "FROM information_schema.columns "
+                        "WHERE table_name = %s "
+                        "ORDER BY ordinal_position",
+                        (table_name,)
+                    )
+                    columns_result = cursor.fetchall()
+                    
+                    self.schema_info[table_name] = [
+                        {"name": col[0], "type": col[1]}
+                        for col in columns_result
+                    ]
+                    logger.debug(f"表 {table_name}: {len(columns_result)} 个字段")
             
             return True
         except Exception as e:
@@ -238,7 +242,7 @@ def main():
     parser.add_argument("--query", "-q", required=True, help="自然语言查询")
     parser.add_argument("--env-file", "-e", default=".env", help=".env 文件路径（默认：.env）")
     parser.add_argument("--output", "-o", help="输出文件路径（可选）")
-    parser.add_argument("--quiet", "-q", action="store_true", help="安静模式")
+    parser.add_argument("--quiet", action="store_true", help="安静模式")
     
     args = parser.parse_args()
     
@@ -252,7 +256,7 @@ def main():
     config = {
         "duckdb": {
             "host": os.getenv("DUCKDB_HOST"),
-            "port": int(os.getenv("DUCKDB_PORT")),
+            "port": int(os.getenv("DUCKDB_PORT", "3306")),
             "user": os.getenv("DUCKDB_USER"),
             "password": os.getenv("DUCKDB_PASSWORD"),
             "database": os.getenv("DUCKDB_DATABASE")

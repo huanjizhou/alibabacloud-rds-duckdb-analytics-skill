@@ -50,11 +50,10 @@ check_python_package() {
     fi
 }
 
-# 检查阿里云 CLI
+# 检查阿里云 CLI（本技能通过 MySQL 协议连接 RDS DuckDB FDW，不需要本地 DuckDB CLI）
 echo ""
 echo "=== CLI 工具检查 | CLI Tools Check ==="
 check_command "aliyun" "Aliyun CLI"
-check_command "duckdb" "DuckDB CLI"
 
 # 检查 Python
 echo ""
@@ -64,7 +63,6 @@ check_command "python3" "Python 3"
 # 检查 Python 包
 echo ""
 echo "=== Python 包检查 | Python Packages Check ==="
-check_python_package "duckdb"
 check_python_package "pymysql"
 check_python_package "pandas"
 check_python_package "yaml"

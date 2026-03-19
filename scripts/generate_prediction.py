@@ -26,6 +26,9 @@ from dotenv import load_dotenv
 
 def generate_script(target, model_type, parameters, config):
     """生成预测脚本 - 支持多模型对比"""
+    table_name = parameters.get("table", "your_table")
+    date_column = parameters.get("date_column", "created_at")
+    metric_column = parameters.get("metric_column", "metric_value")
     timestamp = datetime.now()
     prediction_id = f"pred_{timestamp.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
     
@@ -96,13 +99,17 @@ except ImportError:
 def load_data(conn):
     """加载历史数据"""
     query = """
-    SELECT DATE(created_at) as date, AVG(metric_value) as daily_metric
-    FROM your_table
-    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
-    GROUP BY DATE(created_at)
+    SELECT DATE({date_column}) as date, AVG({metric_column}) as daily_metric
+    FROM {table_name}
+    WHERE {date_column} >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+    GROUP BY DATE({date_column})
     ORDER BY date
     """
-    df = conn.execute(query).fetchdf()
+    with conn.cursor() as cursor:
+        cursor.execute(query)
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+    df = pd.DataFrame(rows, columns=columns)
     return df
 
 
@@ -203,7 +210,7 @@ def train_lasso(df, forecast_periods):
         df_copy['rolling_std_7'] = df_copy['daily_metric'].rolling(window=7, min_periods=1).std()
         
         # 填充 NaN
-        df_copy = df_copy.fillna(method='bfill').fillna(method='ffill')
+        df_copy = df_copy.bfill().ffill()
         
         feature_cols = ['day_index', 'day_squared', 'rolling_mean_7', 'rolling_std_7']
         X = df_copy[feature_cols].values
@@ -515,6 +522,9 @@ def main():
     parser.add_argument("--models", "-m", default="auto", 
                        help="模型选择：auto（自动对比）/ arima / linear_regression / exponential_smoothing / prophet")
     parser.add_argument("--periods", "-p", type=int, default=30, help="预测周期（天数）")
+    parser.add_argument("--table", default="your_table", help="数据表名")
+    parser.add_argument("--date-column", default="created_at", help="日期列名")
+    parser.add_argument("--metric-column", default="metric_value", help="指标列名")
     parser.add_argument("--env-file", "-e", default=".env", help=".env 文件路径")
     parser.add_argument("--output", "-o", help="输出文件路径")
     
@@ -535,7 +545,10 @@ def main():
     }
     
     parameters = {
-        "forecast_periods": args.periods
+        "forecast_periods": args.periods,
+        "table": args.table,
+        "date_column": args.date_column,
+        "metric_column": args.metric_column
     }
     
     # 生成预测脚本
