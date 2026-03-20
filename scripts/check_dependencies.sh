@@ -50,10 +50,14 @@ check_python_package() {
     fi
 }
 
-# 检查阿里云 CLI（本技能通过 MySQL 协议连接 RDS DuckDB FDW，不需要本地 DuckDB CLI）
+# 检查阿里云 CLI（非强制，仅作为白名单自动配置项使用）
 echo ""
 echo "=== CLI 工具检查 | CLI Tools Check ==="
-check_command "aliyun" "Aliyun CLI"
+if command -v aliyun &> /dev/null; then
+    echo -e "${GREEN}✓${NC} Aliyun CLI 已安装 | installed: $(command -v aliyun)"
+else
+    echo -e "${YELLOW}⚠${NC} Aliyun CLI 未安装 | not installed (仅影响自动修复白名单功能，不影响核心查询)"
+fi
 
 # 检查 Python
 echo ""

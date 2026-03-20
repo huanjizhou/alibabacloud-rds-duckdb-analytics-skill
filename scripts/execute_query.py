@@ -178,6 +178,7 @@ def save_result(query_id: str, result: dict, config: dict) -> tuple:
 
 
 def main():
+    global logger
     parser = argparse.ArgumentParser(description="执行 SQL 查询")
     parser.add_argument("--query-id", help="查询记录 ID")
     parser.add_argument("--sql", help="SQL 查询语句")
@@ -192,7 +193,6 @@ def main():
         return 1
     
     # 重新配置日志级别
-    global logger
     logger = setup_logging(args.log_level)
     
     # 加载配置

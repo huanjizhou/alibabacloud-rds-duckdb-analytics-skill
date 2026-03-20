@@ -169,12 +169,12 @@ python3 scripts/generate_prediction.py \
 **用法**:
 ```bash
 python3 scripts/run_prediction.py \
-  --prediction-script /path/to/pred_xxx.py \
+  --script /path/to/pred_xxx.py \
   --env-file .env
 ```
 
 **参数**:
-- `--prediction-script`: 预测脚本路径
+- `--script`: 预测脚本路径
 - `--env-file`: .env 文件路径
 
 **输出**:

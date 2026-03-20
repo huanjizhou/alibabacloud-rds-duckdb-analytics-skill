@@ -9,3 +9,4 @@ python-dotenv>=1.0.0
 # Time series & ML models (Basic)
 statsmodels>=0.14.0
 scikit-learn>=1.0.0
+prophet>=1.1.0

@@ -60,6 +60,7 @@ cd ~/.openclaw/workspace/skills && git clone https://github.com/huanjizhou/aliba
 
 1. **检查依赖**：执行 `bash {baseDir}/scripts/check_dependencies.sh`
    - 未通过 → 进入 Phase A（A1 场景），完成后继续
+   - `aliyun` CLI 仅用于配置白名单，非核心报错无需阻断
 2. **检查 .env**：确认 `{baseDir}/.env` 存在且包含必要字段
    - 不存在 → 进入 Phase A（A2 场景），完成后继续
 3. **测试连接**：执行 `python3 {baseDir}/scripts/read_config.py --env-file {baseDir}/.env`
@@ -316,7 +317,7 @@ Agent 应根据用户需求，使用专业的商业分析思维，**自主编写
 1. 解析预测目标
 2. 生成预测方案：`python3 {baseDir}/scripts/generate_prediction.py --target "{目标}" --env-file {baseDir}/.env`
 3. 展示方案并等待确认
-4. 确认后执行：`python3 {baseDir}/scripts/run_prediction.py --env-file {baseDir}/.env`
+4. 确认后执行：`python3 {baseDir}/scripts/run_prediction.py --script {上一步生成的脚本路径} --env-file {baseDir}/.env`
 
 ### 回复模板
 
