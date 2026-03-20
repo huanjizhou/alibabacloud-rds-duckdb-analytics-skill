@@ -64,39 +64,49 @@ install_aliyun_cli() {
         return
     fi
     
-    case $OS in
-        macos)
-            if command -v brew &> /dev/null; then
-                brew install aliyun-cli
-            else
-                echo -e "${YELLOW}⚠${NC} Homebrew 未安装，尝试手动下载..."
-                ARCH=$(uname -m)
-                if [ "$ARCH" = "arm64" ]; then
-                    CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-arm64.zip"
-                else
-                    CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-darwin-amd64.zip"
-                fi
-                curl -Lo aliyun-cli.zip "$CLI_URL"
-                unzip aliyun-cli.zip
-                sudo mv aliyun /usr/local/bin/
-                rm -rf aliyun-cli.zip aliyun
-            fi
-            ;;
-        *)
-            ARCH=$(uname -m)
-            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-                CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-linux-arm64.zip"
-            else
-                CLI_URL="https://aliyuncli.oss-cn-hangzhou.aliyuncs.com/aliyun-cli-linux-3.0.44-amd64.zip"
-            fi
-            curl -Lo aliyun-cli.zip "$CLI_URL"
-            unzip aliyun-cli.zip
-            sudo mv aliyun /usr/local/bin/
-            rm -rf aliyun-cli.zip aliyun
-            ;;
-    esac
+    # 尝试使用 brew 安装 (如果有)
+    if [ "$OS" = "macos" ] && command -v brew &> /dev/null; then
+        echo "检测到 Homebrew，尝试使用 brew 安装..."
+        if brew install aliyun-cli; then
+            echo -e "${GREEN}✓${NC} 阿里云 CLI (Homebrew) 安装完成"
+            return
+        fi
+        echo -e "${YELLOW}⚠${NC} brew 安装失败，尝试使用官方包下载..."
+    fi
     
-    echo -e "${GREEN}✓${NC} 阿里云 CLI 安装完成"
+    OS_TYPE=""
+    if [ "$OS" = "macos" ]; then
+        OS_TYPE="macosx"
+    else
+        OS_TYPE="linux"
+    fi
+    
+    ARCH=$(uname -m)
+    ARCH_TYPE=""
+    if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+        ARCH_TYPE="amd64"
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+        ARCH_TYPE="arm64"
+    else
+        echo -e "${RED}✗${NC} 不支持的架构: $ARCH"
+        exit 1
+    fi
+    
+    VERSION="3.3.2"
+    CLI_URL="https://github.com/aliyun/aliyun-cli/releases/download/v${VERSION}/aliyun-cli-${OS_TYPE}-${VERSION}-${ARCH_TYPE}.tgz"
+    
+    echo "正在下载: $CLI_URL"
+    if curl -Lo aliyun-cli.tgz "$CLI_URL"; then
+        tar xzf aliyun-cli.tgz
+        sudo mv aliyun /usr/local/bin/
+        rm -f aliyun-cli.tgz
+        echo -e "${GREEN}✓${NC} 阿里云 CLI 安装完成"
+    else
+        echo -e "${RED}✗${NC} 下载失败，请检查网络或配置"
+        rm -f aliyun-cli.tgz
+        exit 1
+    fi
+    
     echo ""
     echo "请运行配置：aliyun configure"
 }
@@ -114,7 +124,6 @@ install_python_packages() {
     pip3 install \
         pymysql>=1.0.0 \
         pandas>=2.0.0 \
-        pyyaml>=6.0 \
         requests>=2.28.0 \
         python-dotenv>=1.0.0 \
         statsmodels>=0.14.0 \

@@ -189,58 +189,71 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 
 ---
 
-## Phase B：数据分析（/duckdb 分析）
+## Phase B：高级数据查验与分析（/duckdb 分析）
 
 **执行者**：子 Agent `query-runner`
 
-### 步骤
+本阶段包含两步核心操作：**1.数据查验（清洗审核）** → **2.专业商业分析**
 
-1. 解析用户自然语言描述
-2. 生成 SQL：`python3 {baseDir}/scripts/generate_sql.py --query "{用户描述}" --env-file {baseDir}/.env`
-3. 展示 SQL 并等待用户确认
-4. 确认后执行：`python3 {baseDir}/scripts/execute_query.py --env-file {baseDir}/.env`
-5. 保存查询记录
+### 步骤 1：数据查验（Data Quality Audit）
+
+在进行任何深度分析或预测前，如果用户未提供清洗好的数据视图，Agent **必须主动**先执行查询获取表的质量概况。
+1. Agent **自行通过 `execute_query.py --sql "<SQL>"`** 执行质量稽查（如查询空值数量、异常极值、重复行）。
+2. 在最终分析前输出简要的【数据体检报告】给用户。
+
+### 步骤 2：专业商业分析执行
+
+Agent 应根据用户需求，使用专业的商业分析思维，**自主编写高级 SQL**。
+*不要局限于 `generate_sql.py` 的基础规则，鼓励 Agent 给子 Agent 发送复杂的探索性分析 SQL（如：漏斗分析、同期群分析、同环比分析等）*。
+
+1. Agent 分析查验结果并根据自然语言直接构造最合适的 SQL 语句。
+2. 展示构造的 SQL 给用户确认。
+3. 执行：`python3 {baseDir}/scripts/execute_query.py --sql "{SQL}" --env-file {baseDir}/.env`
+4. 将返回的查询结果分析得出商业 Insights 面向用户进行解读。
 
 ### 回复模板
 
-**B1 — SQL 确认**
+**B1 — 数据体检报告与 SQL 确认**
 
 严格回复：
 
 ```
-📊 数据分析
+📊 数据分析稽查
 
-【生成 SQL】
+【数据体检报告】
+ • 空值率：...
+ • 重复数据：...
+ • 极值提示：...
 
-{generated_sql}
+【即将执行的分析 SQL】
+{Agent 生成的专业商业分析 SQL}
 
 请确认：
  • 回复「确认」→ 执行查询
- • 回复「修改 XXX」→ 调整 SQL
+ • 回复「修改 XXX」→ 调整逻辑
  • 回复「取消」→ 取消本次分析
 ```
 
-**B2 — 查询成功**
+**B2 — 分析成功**
 
 严格回复：
 
 ```
-📊 查询结果
+📊 深度分析结论
 
-✅ 执行完成（{execution_time_ms}ms）
-✅ 返回 {row_count} 行数据
+✅ 执行完成（{execution_time_ms}ms），返回 {row_count} 行数据
 
-【结果摘要】
-{对查询结果进行关键指标汇总}
+【核心数据指标】
+{对查询结果的数据切片进行核心度量说明}
 
-【记录保存】
-✅ 已保存：{query_id}
-✅ 可通过 /duckdb 问数 {short_keyword} 复用此查询
+【业务洞察 (Insights)】
+ 1. 发现 XX 现象：因为...
+ 2. ...
 
-接下来可以：
- • 回复「查看明细」→ 展示完整数据
- • 回复「每天自动执行」→ 配置为定时任务
- • 发送新请求 → 开始新的分析
+【落地方案建议 (Recommendations)】
+ • 针对该洞察的可行性建议...
+
+可使用 /duckdb 运行预测 <该核心指标> 进一步推演未来趋势。
 ```
 
 **B3 — 查询失败**
@@ -253,11 +266,8 @@ python3 {baseDir}/scripts/fix_whitelist.py \
 ❌ 执行失败
  错误信息：{error_message}
 
-可能原因：
- • 表名或字段名不存在
- • SQL 语法错误
-
-回复「修改」可调整 SQL 后重试。
+可能原因：表名、字段不存在或 SQL 语法错误。
+建议让 Agent 重新检视 Schema 并修改 SQL 测试。
 ```
 
 ### Phase B-2：查询复用（/duckdb 问数）
@@ -325,34 +335,36 @@ python3 {baseDir}/scripts/fix_whitelist.py \
  • 回复「取消」→ 取消
 ```
 
-**C2 — 预测成功**
+**C2 — 预测成功（标准预测分析报告）**
 
-严格回复：
+强制使用以下标准化 Markdown 报告模板：
 
 ```
-📈 预测结果
+# 预测分析报告：{target}
+**当前版本：** {current_tier} | **最优模型：** {best_model_name}
 
-✅ 预测完成
- • 预测 ID：{prediction_id}
- • 使用版本：{current_tier}
- • 训练模型数：{models_trained} 个
- • 最优模型：{best_model_name}
+## 1. 执行摘要 (Executive Summary)
+经过 {models_trained} 个模型的自动竞技，最终选择 {best_model_name}。预计未来 {periods} 天内，目标指标平均值为 {mean_forecast}，将在 {min_forecast} 至 {max_forecast} 范围内波动。
 
-【模型对比】
- 1. {model_1_name}: MSE={mse_1}, MAE={mae_1}
- 2. {model_2_name}: MSE={mse_2}, MAE={mae_2}
- ...
+## 2. 预测趋势 (ASCII Trend Visuals)
+```text
+{从执行结果中直接复制脚本输出的 ASCII 趋势图，不要删除或修改它}
+```
 
-【最优模型预测摘要】
- • 平均预测值：{mean_forecast}
- • 预测范围：{min_forecast} - {max_forecast}
- • 标准差：{std_forecast}
-{Plus/Pro 版会额外显示特征重要性、SHAP 解释或因果效应等}
+## 3. 模型指标对比
+ | 模型 | MSE | MAE |
+ |---|---|---|
+ | {model_1_name} | {mse_1} | {mae_1} |
+ | ... | ... | ... |
 
-【记录保存】
-✅ 已保存，可通过 /duckdb 运行预测 {prediction_id} 重新执行
+## 4. 深度洞察与建议 (Insights & Recommendations)
+ 1. **趋势洞察**：{Agent 根据走势解释}
+ 2. **业务建议**：{Agent 基于此开出的落地“处方”}
+ {Plus/Pro 版额外显示特征重要性、SHAP 解释等}
 
-是否配置为定时任务？（是/否）
+---
+✅ 本次预测 ID：`{prediction_id}`
+是否将此任务配置为定时调度执行？（是/否）
 ```
 
 用户回答「是」→ 进入 Phase E。
