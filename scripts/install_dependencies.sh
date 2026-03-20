@@ -93,19 +93,40 @@ install_aliyun_cli() {
     fi
     
     VERSION="3.3.2"
-    CLI_URL="https://github.com/aliyun/aliyun-cli/releases/download/v${VERSION}/aliyun-cli-${OS_TYPE}-${VERSION}-${ARCH_TYPE}.tgz"
-    
-    echo "正在下载: $CLI_URL"
-    if curl -Lo aliyun-cli.tgz "$CLI_URL"; then
-        tar xzf aliyun-cli.tgz
-        sudo mv aliyun /usr/local/bin/
+    FILENAME="aliyun-cli-${OS_TYPE}-${VERSION}-${ARCH_TYPE}.tgz"
+
+    # 多源下载：阿里云 CDN 优先（国内快），GitHub 兜底
+    URLS=(
+        "https://aliyuncli.alicdn.com/${FILENAME}"
+        "https://github.com/aliyun/aliyun-cli/releases/download/v${VERSION}/${FILENAME}"
+    )
+    # curl 参数：连接超时 15s，最低速度 100KB/s 持续 15s 则放弃，总时间上限 5 分钟
+    CURL_OPTS="-L --connect-timeout 15 --speed-limit 102400 --speed-time 15 --max-time 300 -o aliyun-cli.tgz"
+
+    DOWNLOADED=false
+    for url in "${URLS[@]}"; do
+        echo "正在尝试下载: $url"
+        if curl $CURL_OPTS "$url" 2>&1; then
+            if [ -s aliyun-cli.tgz ]; then
+                DOWNLOADED=true
+                echo -e "${GREEN}✓${NC} 下载完成"
+                break
+            fi
+        fi
+        echo -e "${YELLOW}⚠${NC} 该源下载失败，尝试下一个..."
         rm -f aliyun-cli.tgz
-        echo -e "${GREEN}✓${NC} 阿里云 CLI 安装完成"
-    else
-        echo -e "${RED}✗${NC} 下载失败，请检查网络或配置"
-        rm -f aliyun-cli.tgz
+    done
+
+    if [ "$DOWNLOADED" = false ]; then
+        echo -e "${RED}✗${NC} 所有下载源均失败，请检查网络或手动安装："
+        echo "  https://github.com/aliyun/aliyun-cli/releases"
         exit 1
     fi
+
+    tar xzf aliyun-cli.tgz
+    sudo mv aliyun /usr/local/bin/
+    rm -f aliyun-cli.tgz
+    echo -e "${GREEN}✓${NC} 阿里云 CLI 安装完成"
     
     echo ""
     echo "请运行配置：aliyun configure"
@@ -134,11 +155,16 @@ install_python_packages() {
 # 主流程
 echo ""
 echo "警告 | Warning: 此脚本需要管理员权限 | This script requires admin privileges"
-read -p "是否继续？| Continue? (y/n): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "已取消 | Cancelled"
-    exit 1
+# 非交互模式 (如 OpenClaw 调用) 自动跳过确认
+if [ -t 0 ]; then
+    read -p "是否继续？| Continue? (y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "已取消 | Cancelled"
+        exit 1
+    fi
+else
+    echo "非交互模式，自动继续..."
 fi
 
 install_system_packages
