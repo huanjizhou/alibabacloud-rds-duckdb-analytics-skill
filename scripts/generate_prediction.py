@@ -70,6 +70,19 @@ except ImportError as e:
     print(f"错误：{{e}}")
     sys.exit(1)
 
+def generate_ascii_chart(data, title, width=50):
+    if not data:
+        return ""
+    chart_lines = [f"\\n{{title}}", "=" * max(len(title), width)]
+    min_val, max_val = min(data), max(data)
+    range_val = max_val - min_val if max_val != min_val else 1
+    for i, val in enumerate(data):
+        normalized = int(((val - min_val) / range_val) * width)
+        bar = "█" * normalized
+        chart_lines.append(f"Day {{i+1:02d}}: {{bar}} {{val:.2f}}")
+    chart_lines.append("=" * max(len(title), width) + "\\n")
+    return "\\n".join(chart_lines)
+
 # 模型导入（可选）
 try:
     from statsmodels.tsa.arima.model import ARIMA
@@ -373,26 +386,26 @@ def main():
     from dotenv import load_dotenv
     load_dotenv("{config.get('env_file', '.env')}")
     
-    RDS_HOST = os.getenv("DUCKDB_HOST")
-    RDS_PORT = int(os.getenv("DUCKDB_PORT", "3306"))
-    RDS_USER = os.getenv("DUCKDB_USER")
-    RDS_PASSWORD = os.getenv("DUCKDB_PASSWORD")
-    RDS_DATABASE = os.getenv("DUCKDB_DATABASE")
+    DB_HOST = os.getenv("DUCKDB_HOST")
+    DB_PORT = int(os.getenv("DUCKDB_PORT", "3306"))
+    DB_USER = os.getenv("DUCKDB_USER")
+    DB_PASSWORD = os.getenv("DUCKDB_PASSWORD")
+    DB_DATABASE = os.getenv("DUCKDB_DATABASE")
     
     print("=" * 60)
     print(f"开始预测：{{TARGET}}")
-    print(f"连接 RDS: {{RDS_HOST}}:{{RDS_PORT}}")
+    print(f"连接数据库: {{DB_HOST}}:{{DB_PORT}}")
     print(f"预测周期：{{FORECAST_PERIODS}} 天")
     print("=" * 60)
     
     # 连接数据库
     try:
         conn = pymysql.connect(
-            host=RDS_HOST,
-            port=RDS_PORT,
-            user=RDS_USER,
-            password=RDS_PASSWORD,
-            database=RDS_DATABASE,
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_DATABASE,
             charset="utf8mb4",
             connect_timeout=10
         )
@@ -480,8 +493,11 @@ def main():
             "std": float(np.std(best_result["forecast"])),
             "min": float(np.min(best_result["forecast"])),
             "max": float(np.max(best_result["forecast"]))
-        }}
+        }},
+        "ascii_chart": generate_ascii_chart(best_result["forecast"], f"{{best_result['model_name']}} 预测趋势图")
     }}
+    
+    print(all_results["ascii_chart"])
     
     # 保存结果
     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
@@ -536,7 +552,7 @@ def main():
     # 加载配置
     load_dotenv(args.env_file)
     config = {
-        "rds": {
+        "duckdb": {
             "host": os.getenv("DUCKDB_HOST"),
             "port": int(os.getenv("DUCKDB_PORT", "3306")),
             "user": os.getenv("DUCKDB_USER"),

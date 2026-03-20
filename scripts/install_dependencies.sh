@@ -124,7 +124,6 @@ install_python_packages() {
     pip3 install \
         pymysql>=1.0.0 \
         pandas>=2.0.0 \
-        requests>=2.28.0 \
         python-dotenv>=1.0.0 \
         statsmodels>=0.14.0 \
         scikit-learn>=1.0.0

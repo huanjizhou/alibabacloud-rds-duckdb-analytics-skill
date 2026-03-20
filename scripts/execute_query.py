@@ -65,17 +65,17 @@ def execute_query(sql: str, config: dict) -> dict:
     try:
         # 通过 RDS MySQL 连接（DuckDB FDW）
         conn = pymysql.connect(
-            host=config["rds"]["host"],
-            port=config["rds"]["port"],
-            user=config["rds"]["user"],
-            password=config["rds"]["password"],
-            database=config["rds"]["database"],
+            host=config["duckdb"]["host"],
+            port=config["duckdb"]["port"],
+            user=config["duckdb"]["user"],
+            password=config["duckdb"]["password"],
+            database=config["duckdb"]["database"],
             charset="utf8mb4",
             cursorclass=pymysql.cursors.DictCursor,
             connect_timeout=10  # 10 秒连接超时
         )
         
-        logger.info(f"数据库连接成功：{config['rds']['host']}:{config['rds']['port']}")
+        logger.info(f"数据库连接成功：{config['duckdb']['host']}:{config['duckdb']['port']}")
         
         with conn.cursor() as cursor:
             cursor.execute(sql)
@@ -198,7 +198,7 @@ def main():
     # 加载配置
     load_dotenv(args.env_file)
     config = {
-        "rds": {
+        "duckdb": {
             "host": os.getenv("DUCKDB_HOST"),
             "port": int(os.getenv("DUCKDB_PORT", "3306")),
             "user": os.getenv("DUCKDB_USER"),
@@ -209,7 +209,7 @@ def main():
     }
     
     # 验证 RDS 配置
-    if not all([config["rds"]["host"], config["rds"]["user"], config["rds"]["password"]]):
+    if not all([config["duckdb"]["host"], config["duckdb"]["user"], config["duckdb"]["password"]]):
         logger.error("RDS 配置不完整，请检查 .env 文件中的 DUCKDB_HOST/DUCKDB_USER/DUCKDB_PASSWORD")
         return 1
     

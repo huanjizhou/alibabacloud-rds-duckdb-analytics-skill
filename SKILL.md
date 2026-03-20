@@ -415,7 +415,19 @@ Agent 应根据用户需求，使用专业的商业分析思维，**自主编写
 
 ## Phase E：配置定时任务
 
-根据用户回答生成 cron，写入 `~/.openclaw/openclaw.json` (agent: `duckdb-prediction-cron`，执行 `run_prediction.py`)。
+1. 先向用户明确提问：「请告诉我期望的执行频率（每天/每周）和具体时间（如 08:00）。」
+2. 根据回答生成 cron 表达式，并写入 `~/.openclaw/openclaw.json`：
+```json
+{
+ "agents": {
+  "duckdb-prediction-cron": {
+   "cron": "{cron_expression}",
+   "message": "执行 DuckDB 预测任务：python3 {baseDir}/scripts/run_prediction.py --prediction-id {prediction_id} --env-file {baseDir}/.env",
+   "skill": "alibabacloud-rds-duckdb-analytics"
+  }
+ }
+}
+```
 严格回复：
 ```
 ✅ 任务配置完成！( {frequency} {time} ) 
