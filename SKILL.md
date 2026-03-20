@@ -12,10 +12,19 @@ metadata: { "openclaw": { "emoji": "🦆", "requires": { "bins": ["python3", "pi
 
 ## 协议约定
 
-- **主 Agent**：负责命令分发、用户交互、状态流转
-- **子 Agent**：负责环境检查、SQL 生成与执行、预测分析、定时任务配置
+- **主 Agent**：负责命令分发、交互与状态流转
+- **子 Agent**：负责环境检查、SQL 执行、预测与定时任务
 - 所有回复**必须严格遵循**下方定义的回复模板
-- 模板中 `{variable}` 为占位符，替换为实际值
+
+## 功能支持概览
+
+| 功能模块 | 状态 | 说明 |
+|---------|------|------|
+| SQL 查询 | ✅ | 自然语言转 SQL，在 RDS DuckDB FDW 执行 |
+| 多模型预测 | ✅ | 多基线模型竞技 + Plus/Pro 版本进化支持 |
+| 数据清洗 | ✅ | 深度分析前结构化排查空值与重复项 |
+| 报告生成 | ✅ | 自动汇总评估结果输出标准 Markdown 报告 |
+| 数据可视化 | ✅ | 内置 ASCII 趋势图表控制台原生绘制能力 |
 
 ## 命令体系
 
@@ -392,98 +401,25 @@ Agent 应根据用户需求，使用专业的商业分析思维，**自主编写
 
 ## Phase D：查看记录（/duckdb 记录）
 
-**执行者**：子 Agent `record-viewer`
-
-读取 `records/` 目录下的查询和预测记录。
-
-### 回复模板
-
-**D1 — 记录列表**
-
-严格回复：
-
+读取 `records/` 下的查询和预测记录。若无记录，回复暂无。
+有记录严格回复：
 ```
 📜 历史记录（{date}）
-
-【查询记录】
-{按时间倒序列出，每条一行}
- {序号}. {query_id} — {natural_language}（{row_count} 行，{execution_time_ms}ms）
-
-【预测记录】
-{按时间倒序列出}
- {序号}. {prediction_id} — {target}（{model}）
-
-共 {total} 条记录。可用 /duckdb 问数 <ID> 复用查询。
-```
-
-**D2 — 无记录**
-
-严格回复：
-
-```
-📜 历史记录
-
-暂无记录。使用 /duckdb 分析 <问题> 开始您的第一次查询。
+【查询】
+ {序号}. {query_id} — {nl_query} ({time}ms)
+【预测】
+ {序号}. {prediction_id} — {target} ({model})
 ```
 
 ---
 
 ## Phase E：配置定时任务
 
-**执行者**：子 Agent `cron-scheduler`
-
-### 步骤
-
-1. 收集调度参数（频率、时间）
-2. 配置 OpenClaw cron
-
-### 回复模板
-
-**E1 — 收集参数**
-
+根据用户回答生成 cron，写入 `~/.openclaw/openclaw.json` (agent: `duckdb-prediction-cron`，执行 `run_prediction.py`)。
 严格回复：
-
 ```
-⏰ 定时任务配置
-
-请告诉我您期望的执行方案：
- 1. 执行频率：每天 / 每周 / 每月
- 2. 执行时间：如 08:00
- 3. 如选每周，请指定星期几
-
-示例：「每天早上 8:00 执行」
-```
-
-**E2 — 配置完成**
-
-根据用户回答生成 cron 表达式，写入 `~/.openclaw/openclaw.json`：
-
-```json
-{
- "agents": {
- "duckdb-prediction-cron": {
- "cron": "{cron_expression}",
- "message": "执行 DuckDB 预测任务：python3 {baseDir}/scripts/run_prediction.py --prediction-id {prediction_id} --env-file {baseDir}/.env",
- "skill": "alibabacloud-rds-duckdb-analytics"
- }
- }
-}
-```
-
-严格回复：
-
-```
-✅ 定时任务配置完成！
-
-📋 配置摘要：
- • 任务：{prediction_target}
- • 频率：{frequency}
- • 执行时间：{time}
- • Cron 表达式：{cron_expression}
-
-🔄 下次执行时间：{next_run_time}
-
-如需修改配置，随时告诉我。
+✅ 任务配置完成！( {frequency} {time} ) 
+Cron: {cron_expression} | 下次运行: {next_run_time}
 ```
 
 ---
